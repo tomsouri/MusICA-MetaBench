@@ -88,6 +88,19 @@ def get_rhythm():
             dotted_ql = quarter_length * 1.5
             rhythm_dict[str(dotted_ql)] = f"dotted-{duration_type}"
 
+    # Add tuplets (common ratios)
+    tuplet_names = {
+        "2/3": "triplet",
+        "3/2": "duplet",
+        "4/3": "quadruplet",
+        "5/4": "quintuplet",
+        "6/4": "sextuplet",
+        "7/4": "septuplet",
+        "8/7": "octuplet",
+    }
+    for ratio, name in tuplet_names.items():
+        rhythm_dict[ratio] = name
+
     return rhythm_dict
 
 def get_time_signatures():
@@ -204,19 +217,23 @@ def get_chords():
 
 def get_cadence_types():
     """
-    Generates a dictionary of cadence types using a manually sampled list of 
-    the most frequent Roman numeral combinations (20-50).
-    If a YAML file with the ontology exists, it loads it. Otherwise, it builds the ontology and saves it.
+    Loads or builds cadence types ontology.
+    - If selected_cadences.yaml exists, loads it
+    - Otherwise builds the base list, adds defaults, and saves to file
+    - Always ensures the file is saved for persistence
     """
     ontology_path = "selected_cadences.yaml"
 
+    # Try to load existing file
     if os.path.exists(ontology_path):
         with open(ontology_path, 'r') as file:
             print(f"Loading cadence types ontology from {ontology_path}")
-            return yaml.load(file, Loader=yaml.FullLoader)
+            ontology = yaml.load(file, Loader=yaml.FullLoader)
+            if ontology:
+                return ontology
 
+    # Build base cadences if file doesn't exist or is empty
     print(f"Building cadence types ontology...")
-    # Manually sampled frequent Roman numeral combinations (approx 45 samples)
     selected_list = [
         "V - I", "V7 - I", "v - i", "V - i", "V7 - i", 
         "vii - I", "vii7 - I", "vii - i", "vii7 - i",
@@ -240,6 +257,7 @@ def get_cadence_types():
     selected_list = list(selected_list)
     ontology = {cad: cad for cad in selected_list}
     
+    # Save the base ontology to file for future use
     with open(ontology_path, 'w') as file:
         yaml.dump(ontology, file)
         print(f"Cadence types ontology saved to {ontology_path}")
@@ -340,12 +358,14 @@ class AnswerDistractorExtractors:
         else:
             self.dict_rhythm_prop_ontology = self.build_rhythm_prop_ontology(system)
             self.ontology['rhythm_proportion'] = [{k:v} for k,v in self.dict_rhythm_prop_ontology.items()]
-        self.voice_mapping = {
-                    'S': 0, # Soprano
-                    'A': 1, # Alto
-                    'T': 2, # Tenor
-                    'B': 3  # Bass
-                }
+
+        self.voice_mapping = {}
+        idx = 0
+        temp_dict = {k: v for d in self.ontology['voice'] for k, v in d.items()}
+        for short_name, full_name in temp_dict.items():
+            self.voice_mapping[short_name] = idx
+            idx +=1
+        
         if "cadences" in self.ontology.keys():
             self.dict_cadence_ontology = {k: v for d in self.ontology['cadences'] for k, v in d.items()}
         #  TODO: TO SOLVE / very slow
@@ -465,7 +485,8 @@ class AnswerDistractorExtractors:
 
         else:
             raise ValueError(f"Unknown hamonic system for harmonical recognition: {system}")
-    def get_nth_note(self,path: str, values: dict) -> str:
+    
+    def get_nth_note(self, path: str, values: dict) -> str:
         """
         Logic: Parses a MusicXML file and returns the scientific pitch notation 
         of the index-th note in the specified voice part.
@@ -485,7 +506,7 @@ class AnswerDistractorExtractors:
         
         # Parse the MusicXML file into a music21 Stream
         score = converter.parse(musicxml_path)
-               
+        
         voice_key = values.get('voice')
         if voice_key not in self.voice_mapping:
             raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
@@ -521,8 +542,8 @@ class AnswerDistractorExtractors:
         
         if not(self.random_distractors):
             # Build a set of candidate distractor notes (exclude the true note)
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 notes += other_notes
             possible_distractors = set([n.name for n in notes if n.name != target_note.name])
@@ -585,8 +606,8 @@ class AnswerDistractorExtractors:
 
         if not self.random_distractors:
             all_notes = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 all_notes.append([n.name for n in other_notes])
             possible_values = []
@@ -662,8 +683,8 @@ class AnswerDistractorExtractors:
         
         if not self.random_distractors:
             all_interval_keys = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx]
@@ -740,8 +761,8 @@ class AnswerDistractorExtractors:
         
         if not self.random_distractors:
             voice_intervals = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx]
@@ -819,14 +840,14 @@ class AnswerDistractorExtractors:
 
         if not self.random_distractors:
             all_notes = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 all_notes += other_notes
             # Build a set of candidate distractor rhythms (exclude the true rhythm)
 
             distractor_pool_set = set(n.quarterLength for n in all_notes)
-            distractor_pool = [self.dict_rhythm_ontology[str(sample)] for sample in distractor_pool_set if str(sample) != target_rhythm]
+            distractor_pool = [self.dict_rhythm_ontology[str(sample)] for sample in distractor_pool_set if str(sample) != target_rhythm and str(sample) in self.dict_rhythm_ontology.keys()]
             # distractor_pool = [{str(n.quarterLength): str(n.type)} for n in set_all_notes if str(n.quarterLength) != target_rhythm]
         else:
             distractor_pool = [] #self.rng.choice(list(self.dict_rhythm_ontology.values()), len(list(self.dict_rhythm_ontology.values())), replace=False).tolist()
@@ -874,8 +895,8 @@ class AnswerDistractorExtractors:
     
         if not self.random_distractors:
             all_notes = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 all_notes.append([n.quarterLength for n in other_notes])
             possible_values = []
@@ -960,8 +981,8 @@ class AnswerDistractorExtractors:
               
         if not self.random_distractors:
             all_props = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx].quarterLength
@@ -1039,8 +1060,8 @@ class AnswerDistractorExtractors:
             
         if not self.random_distractors:
             all_props = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx].quarterLength
@@ -1106,7 +1127,6 @@ class AnswerDistractorExtractors:
             return None, [], question_values
         
         else:
-
             keys_dict["tonic"]  = key_signatures.name
             #keys_dict["dominant"]  = key.Key(key_signatures.getDominant().name, key_signatures.mode).asKey().name
             keys_dict["dominant"]  = key_signatures.getDominant().name
@@ -1291,77 +1311,84 @@ class AnswerDistractorExtractors:
         # This function can be extended to handle different types of questions by checking the question type and calling the appropriate extraction method.
         # For now, it directly calls get_nth_note as an example.
         
-        ground_truth, ground_truth_pool, new_values = method(path, question_values) # self.get_nth_note_ground_truth(path, question_values)
-        #new values look like this 
-        #{'target_index': 38, 'voice': 'S'}
-        # i need: new_words = {"target_index": 38th, "voice": "soprano"}
-        new_words = {}
-      
-        for var_name, value_symbol in new_values.items():
-            value_symbol = str(value_symbol)
-            if var_name in self.ontology:
-                if var_name == 'target_index':
-                    new_words[var_name] = self.ontology['target_index'][int(value_symbol)][value_symbol]
-                else:
-                    possible_dicts = self.ontology[var_name]
-                    for dict_item in possible_dicts:
-                        if value_symbol in dict_item:
-                            new_words[var_name] = dict_item[value_symbol]  
-
-        # TODO: Kacko, would the following make sense?
-        # if this code is used later, the code for sampling random distractors can be removed from the individual functions.
-        # if self.random_distractors:
-        #     # throw away the extracted distractors from the piece and use the precomputed ones
-        #     method_name = method.__name__
-        #     ground_truth_pool = self.rng.choice(self.random_distractor_pools[method_name], self.distractor_pool_size, replace=False).tolist()
-
-    
-       # distractor_pool = self.get_distractors(distractor_keys, ground_truth_pool)
-       # breakpoint()
-       # additional, just safety reasons: Ensure the ground truth is not in the distractor pool
-        if ground_truth in ground_truth_pool:
-            ground_truth_pool.remove(ground_truth)
-
-
-        if len(set(ground_truth_pool))< self.min_num_distractors:
-            # Not enough distractors. We need to add additional distractors (from the pool of random distractors for the given question)
-            
-            method_name = method.__name__
-            
+        musicxml_path = get_musicxml_file_path(path)
+        score = converter.parse(musicxml_path)
+        if len(score.parts) != 4:
             if self.config.get('verbose', False):
-                print(f"Warning: Only {len(set(ground_truth_pool))} unique distractors generated for question {method_name}. Falling back to random distractors.")
-            
+                print(f"Warning: Expected 4 parts in the score, but found {len(score.parts)}. Check the MusicXML file for potential issues.")
+            return None, [], question_values, {}
+        else:
+            ground_truth, ground_truth_pool, new_values = method(path, question_values) # self.get_nth_note_ground_truth(path, question_values)
+            #new values look like this 
+            #{'target_index': 38, 'voice': 'S'}
+            # i need: new_words = {"target_index": 38th, "voice": "soprano"}
+            new_words = {}
+        
+            for var_name, value_symbol in new_values.items():
+                value_symbol = str(value_symbol)
+                if var_name in self.ontology:
+                    if var_name == 'target_index':
+                        new_words[var_name] = self.ontology['target_index'][int(value_symbol)][value_symbol]
+                    else:
+                        possible_dicts = self.ontology[var_name]
+                        for dict_item in possible_dicts:
+                            if value_symbol in dict_item:
+                                new_words[var_name] = dict_item[value_symbol]  
+
+            # TODO: Kacko, would the following make sense?
+            # if this code is used later, the code for sampling random distractors can be removed from the individual functions.
+            # if self.random_distractors:
+            #     # throw away the extracted distractors from the piece and use the precomputed ones
+            #     method_name = method.__name__
+            #     ground_truth_pool = self.rng.choice(self.random_distractor_pools[method_name], self.distractor_pool_size, replace=False).tolist()
+
+        
+        # distractor_pool = self.get_distractors(distractor_keys, ground_truth_pool)
+        # breakpoint()
+        # additional, just safety reasons: Ensure the ground truth is not in the distractor pool
+            if ground_truth in ground_truth_pool:
+                ground_truth_pool.remove(ground_truth)
+
+
+            if len(set(ground_truth_pool))< self.min_num_distractors:
+                # Not enough distractors. We need to add additional distractors (from the pool of random distractors for the given question)
+                
+                method_name = method.__name__
+                
+                if self.config.get('verbose', False):
+                    print(f"Warning: Only {len(set(ground_truth_pool))} unique distractors generated for question {method_name}. Falling back to random distractors.")
+                
+                ground_truth_pool = list(set(ground_truth_pool))
+                len_diff = self.min_num_distractors - len(ground_truth_pool)          
+
+                random_distractor_pool = set(self.random_distractor_pools[method_name])
+                
+                # make sure that the pool we will be sampling from does not contain anything already present in the pool
+                for distractor in ground_truth_pool:
+                    random_distractor_pool.discard(distractor)
+
+                # and make sure it does not contain the ground truth
+                random_distractor_pool.discard(ground_truth)
+
+                # to ensure reproducibility
+                random_distractor_pool = sorted(list(random_distractor_pool))
+
+                additional_distractors = self.rng.choice(random_distractor_pool, len_diff, replace=False).tolist()
+                
+                ground_truth_pool += additional_distractors
+
+                if len(ground_truth_pool) < self.min_num_distractors:
+                    if self.verbose:
+                        print(f"Warning: Not enough unique distractors available to reach the minimum of {self.min_num_distractors}. Only {len(set(ground_truth_pool))} unique distractors will be used.")
+
             ground_truth_pool = list(set(ground_truth_pool))
-            len_diff = self.min_num_distractors - len(ground_truth_pool)          
 
-            random_distractor_pool = set(self.random_distractor_pools[method_name])
-            
-            # make sure that the pool we will be sampling from does not contain anything already present in the pool
-            for distractor in ground_truth_pool:
-                random_distractor_pool.discard(distractor)
-
-            # and make sure it does not contain the ground truth
-            random_distractor_pool.discard(ground_truth)
-
-            # to ensure reproducibility
-            random_distractor_pool = sorted(list(random_distractor_pool))
-
-            additional_distractors = self.rng.choice(random_distractor_pool, len_diff, replace=False).tolist()
-            
-            ground_truth_pool += additional_distractors
-
-            if len(ground_truth_pool) < self.min_num_distractors:
-                if self.verbose:
-                    print(f"Warning: Not enough unique distractors available to reach the minimum of {self.min_num_distractors}. Only {len(set(ground_truth_pool))} unique distractors will be used.")
-
-        ground_truth_pool = list(set(ground_truth_pool))
-
-        # Sort the distractor pool in order to ensure reproducibility, which is hindered by the use of sets.
-        ground_truth_pool = sorted(ground_truth_pool)
-        self.ontology['rhythm_proportion'] = [{k:v} for k,v in self.dict_rhythm_prop_ontology.items()]
-        self.ontology['cadence'] = [{k:v} for k,v in self.dict_cadence_ontology.items()]
-        yaml.dump(self.ontology, open('generated_ontology.yaml','w'))
-        return ground_truth, ground_truth_pool, new_values, new_words
+            # Sort the distractor pool in order to ensure reproducibility, which is hindered by the use of sets.
+            ground_truth_pool = sorted(ground_truth_pool)
+            self.ontology['rhythm_proportion'] = [{k:v} for k,v in self.dict_rhythm_prop_ontology.items()]
+            self.ontology['cadence'] = [{k:v} for k,v in self.dict_cadence_ontology.items()]
+            yaml.dump(self.ontology, open('generated_ontology.yaml','w'))
+            return ground_truth, ground_truth_pool, new_values, new_words
 
 
 def remove_lowercase_and_digits(text):

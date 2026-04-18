@@ -342,7 +342,10 @@ def step_1_5_extract_ground_truth_and_distractors(data, config, fields):
         
         # try:
         ground_truth, distractor_pool, values_dict, new_values_word = AnswerDistractorExtractors.extract_answer_and_distractors(method_func, row['path'], values_dict)
-        
+        if ground_truth is None:
+            print(f"Warning: Ground truth extraction returned None for item (meta-qid: {row.get('meta-question_id', 'Unknown')}). This item will be skipped.")
+            stats["errors"] += 1
+            continue
         row['values']  = json.dumps(new_values_word)
         row['question'] = row['text_with_wildcards'].format(**{**values_dict, **new_values_word})
         
