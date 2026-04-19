@@ -8,10 +8,13 @@
 I - I: I - I
 I - IV: I - IV
 I - V: I - V
+I - VII: I - VII
 I - fI: I - fI
 I - i: I - i
 I - v: I - v
 I - vi: I - vi
+II - II: II - II
+II - i: II - i
 II - v: II - v
 III - III: III - III
 III - IV: III - IV
@@ -39,12 +42,16 @@ V7 - VI: V7 - VI
 V7 - fV7: V7 - fV7
 V7 - i: V7 - i
 V7 - vi: V7 - vi
+VI - II: VI - II
 VI - III: VI - III
 VI - V: VI - V
+VI - VI: VI - VI
 VI - VII: VI - VII
 VI - fVI: VI - fVI
 VI - ii: VI - ii
+VI - iii: VI - iii
 VI - iv: VI - iv
+VII - I: VII - I
 VII - III: VII - III
 VII - IV: VII - IV
 VII - VII: VII - VII
@@ -53,6 +60,7 @@ VII - ii: VII - ii
 VII - iv: VII - iv
 VII - v: VII - v
 i - I: i - I
+i - II: i - II
 i - III: i - III
 i - IV: i - IV
 i - V: i - V
@@ -61,6 +69,7 @@ i - VII: i - VII
 i - fi: i - fi
 i - i: i - i
 i - iv: i - iv
+i - vi: i - vi
 ii - III: ii - III
 ii - IV: ii - IV
 ii - V: ii - V
@@ -80,6 +89,7 @@ iv - VII: iv - VII
 iv - fiv: iv - fiv
 iv - i: iv - i
 iv - ii: iv - ii
+iv - v: iv - v
 v - II: v - II
 v - III: v - III
 v - IV: v - IV
@@ -88,6 +98,7 @@ v - VI: v - VI
 v - fv: v - fv
 v - i: v - i
 v - v: v - v
+v - vii: v - vii
 vi - I: vi - I
 vi - V: vi - V
 vi - fvi: vi - fvi

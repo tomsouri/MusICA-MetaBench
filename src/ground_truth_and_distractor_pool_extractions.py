@@ -124,10 +124,19 @@ def get_tonality():
     for pc in range(12):
         p = pitch.Pitch()
         p.pitchClass = pc
-        for mode in modes:
-            word = f"{p.name} {mode}"
-            ontology[word] = word
-        ontology[p.name] = p.name # also include the pitch class name alone as a potential answer (e.g., for questions about key signatures without mode specified)
+        
+        # Get both the primary name and its enharmonic equivalent
+        pitch_names = {p.name}
+        enharmonic = p.getEnharmonic()
+        if enharmonic and enharmonic.name != p.name:
+            pitch_names.add(enharmonic.name)
+        
+        # Add both tonality and mode combinations for all enharmonic spellings
+        for pitch_name in pitch_names:
+            for mode in modes:
+                word = f"{pitch_name} {mode}"
+                ontology[word] = word
+    
     return ontology
 
 def get_ordinal_suffix(n: int) -> str:
@@ -1129,7 +1138,7 @@ class AnswerDistractorExtractors:
         else:
             keys_dict["tonic"]  = key_signatures.name
             #keys_dict["dominant"]  = key.Key(key_signatures.getDominant().name, key_signatures.mode).asKey().name
-            keys_dict["dominant"]  = key_signatures.getDominant().name
+            #keys_dict["dominant"]  = key_signatures.getDominant().name
             keys_dict["relative minor/major"] = key_signatures.relative.name                    
             target_key_signature_name = self.dict_tonality_ontology[keys_dict[harmonic_function]]            
             if not(self.random_distractors):
@@ -1176,7 +1185,10 @@ class AnswerDistractorExtractors:
         else:
             if "with" in target_chord:  # filter out chords with added tones (e.g., "C major with added sixth")
                 target_chord = target_chord.split(" with")[0]
-            target_chord_name = self.dict_chord_ontology[target_chord]
+            if target_chord not in self.dict_chord_ontology.keys():
+                return None, [], question_values
+            else:
+                target_chord_name = self.dict_chord_ontology[target_chord]
             
             if not(self.random_distractors):
                 chords = [chord.commonName for chord in chords]
@@ -1322,6 +1334,11 @@ class AnswerDistractorExtractors:
             #new values look like this 
             #{'target_index': 38, 'voice': 'S'}
             # i need: new_words = {"target_index": 38th, "voice": "soprano"}
+            if ground_truth is None:
+                if self.config.get('verbose', False):
+                    print(f"Could not extract ground truth for question {method.__name__}. This question will be skipped.")
+                return None, [], question_values, {}
+            
             new_words = {}
         
             for var_name, value_symbol in new_values.items():
