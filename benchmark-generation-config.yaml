@@ -34,7 +34,7 @@ cmdline_args:
   meta: "meta-questions.tsv"
   pieces: "pieces.tsv"
   methods_path: "src/ground_truth_and_distractor_pool_extractions.py"
-  output: "benchmark_8-11.tsv"
+  output: "benchmark_v1.tsv"
 
 allowed_metaq_ids:
   - 1
@@ -55,7 +55,7 @@ max_target_index: 20 # Until which index do we ask? (in questions like "what is 
 music_ontology_settings:
   ontology_path: "ontology.yaml"
   harmonic_system: "tonal"
-
+  use_xml_part_names: true # whether to use the scpore parts defined in the ontology.yaml file under 'voice' (if true, the code will look for the MusicXML partName for every part, and use that in the questions), Default = False
 balance_meta_questions_perfectly: false # whether the per-meta-question counts should be perfectly balanced in the per-subcategory count in the final subsampled benchmark
 allow_meta_question_backoff: true # If set to True, enables the redistribution of missing items to other meta-questions: useful in cases when some meta-questions have a limited number of possible questions and the desired number of questions per subcategory is high.
 
