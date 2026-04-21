@@ -18,6 +18,8 @@ from operator import index
 
 from music21 import converter, note, chord, stream, interval, pitch, meter,key,roman,duration
 import os
+
+import music21
 from utils import get_musicxml_file_path
 import yaml
 import itertools
@@ -500,24 +502,33 @@ class AnswerDistractorExtractors:
     def get_part_and_notes(self, score, values, rests=False):
         if self.use_xml_part_names:
             score_voices = {str(i):score.parts[i].partName for i in range(len(score.parts))}
-            stop_it = 0
+            tried_voices = []
             notes = []
             while not notes:
                 chosen_voice = self.rng.choice(list(score_voices.keys()))
+                tried_voices.append(chosen_voice)
                 part_index = int(chosen_voice)
                 voice_key = score_voices[chosen_voice]
                 values['voice'] = voice_key
                 target_part = score.parts[part_index]
                 # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
                 if rests:
-                    notes = list(target_part.flatten().notesAndRests)
+                    check_chords = list(target_part.flatten().getElementsByClass(music21.chord.Chord))
+                    if check_chords:
+                        notes = []
+                    else:
+                        notes = list(target_part.flatten().notesAndRests)
                 else:
-                    notes = list(target_part.flatten().getElementsByClass(note.Note))
-                stop_it +=1
-                if not notes and stop_it >= len(score_voices):
+                    check_chords = list(target_part.flatten().getElementsByClass(music21.chord.Chord))
+                    if check_chords:
+                        notes = []
+                    else:    
+                        notes = list(target_part.flatten().getElementsByClass(note.Note))
+                
+                if not notes and len(set(tried_voices)) == len(score_voices):
                     if self.verbose:
-                        print(f"Warning: No valid notes found in any part of the score. Skipping datapoint: {score.title}.")
-                    return None, None, values
+                        print(f"Warning: No valid notes found in any part of the score. Skipping datapoint.")
+                    return None, values
             
         else: # default, for same n-voices setup on all data, defined in ontology['voice']
             voice_key = values.get('voice')
@@ -531,7 +542,7 @@ class AnswerDistractorExtractors:
             # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
             notes = list(target_part.flatten().getElementsByClass(note.Note))
             if not notes:
-                raise ValueError(f"No valid notes found in part '{voice_key}' for the score '{score.title}'.")  
+                raise ValueError(f"No valid notes found in part '{voice_key}' for the score '{score}'.")  
         return notes, values
     
     def get_nth_note(self, path: str, question_values: dict) -> str:
@@ -729,7 +740,7 @@ class AnswerDistractorExtractors:
        
         if target_interval not in self.dict_interval_ontology.keys():
             raise ValueError(f"Invalid pitch specified: {target_interval}. Expected one of {self.dict_interval_ontology}.")
-
+       
         notes, question_values = self.get_part_and_notes(score, question_values)          
     
         #for test_note in score.parts[0].flatten().getElementsByClass(note.Note):
@@ -907,6 +918,7 @@ class AnswerDistractorExtractors:
                 self.dict_rhythm_prop_ontology[str(round(target_prop,2))] =f"1:{round(target_prop)}"
             else:
                 self.dict_rhythm_prop_ontology[str(round(target_prop,2))] = f"{str(round(1/target_prop))}:1"
+            target_prop_name = self.dict_rhythm_prop_ontology[str(round(target_prop,2))]
             if self.config.get('verbose', False):
                 print(f"Could not match detected rhythm prop '{target_prop}' to any ontology entry. Added pattern {self.dict_rhythm_prop_ontology[str(round(target_prop,2))]} to ontology.")
               
@@ -1248,11 +1260,13 @@ class AnswerDistractorExtractors:
             if var_name in self.ontology:
                 if var_name == 'target_index':
                     new_words[var_name] = self.ontology['target_index'][int(value_symbol)][value_symbol]
-                # else:
-                #     possible_dicts = self.ontology[var_name]
-                #     for dict_item in possible_dicts:
-                #         if value_symbol in dict_item:
-                #             new_words[var_name] = dict_item[value_symbol]  
+                elif var_name == 'voice':
+                    continue
+                else:
+                    possible_dicts = self.ontology[var_name]
+                    for dict_item in possible_dicts:
+                        if value_symbol in dict_item:
+                            new_words[var_name] = dict_item[value_symbol]  
 
         # TODO: Kacko, would the following make sense?
         # if this code is used later, the code for sampling random distractors can be removed from the individual functions.
