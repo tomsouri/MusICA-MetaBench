@@ -17,6 +17,7 @@ import subprocess
 import os
 import platform
 import argparse, sys
+import shutil
 
 def get_musescore_path():
     """Returns the default MuseScore executable path based on the OS."""
@@ -41,8 +42,34 @@ def get_musescore_path():
         raise FileNotFoundError("MuseScore not found in macOS Applications.")
     
     elif system == "Linux":
-        # Usually just 'mscore' in the PATH on Linux
-        return "mscore3"
+        # Try common MuseScore command names first
+        candidates = [
+            "mscore4", "mscore", "mscore3", "musescore", "MuseScore"
+        ]
+        for name in candidates:
+            path = shutil.which(name)
+            if path:
+                return path
+
+        # Look for AppImage in common location
+        appimage_dir = "/opt/tools/musescore"
+        if os.path.isdir(appimage_dir):
+            for fname in os.listdir(appimage_dir):
+                if fname.lower().startswith("musescore") and fname.endswith(".AppImage"):
+                    candidate = os.path.join(appimage_dir, fname)
+                    if os.path.exists(candidate):
+                        return candidate
+
+        # Last resort: check /usr/bin locations
+        for p in ("/usr/bin/musescore", "/usr/bin/mscore", "/usr/local/bin/musescore"):
+            if os.path.exists(p):
+                return p
+
+        raise FileNotFoundError(
+            "MuseScore executable not found.\n"
+            "Set the path with the -m/--musescore option or set MUSESCORE_PATH environment variable.\n"
+            "Tried: PATH commands [mscore4, mscore, mscore3, musescore], /opt/tools/musescore AppImages, and /usr/bin locations."
+        )
 
 def convert_musicxml_to_pdf(input_mxml, output_pdf=None, musescore_path=None):
     """
@@ -112,7 +139,7 @@ def main():
     parser.add_argument(
         "-m", "--musescore",
         required=False,
-        default="/opt/tools/musescore/MuseScore-Studio-4.6.4.253351238-x86_64.AppImage",
+        default=None,
         help="Path to the MuseScore executable (optional, will try to auto-detect if not provided)"
     )
     
@@ -123,13 +150,18 @@ def main():
     
     args = parser.parse_args()
 
+    # Allow environment override
     if not args.musescore:
-        try:
-            args.musescore = get_musescore_path()
-            print(f"Auto-detected MuseScore path: {args.musescore}")
-        except FileNotFoundError as e:
-            print(str(e), file=sys.stderr)
-            sys.exit(1)
+        env_path = os.environ.get("MUSESCORE_PATH")
+        if env_path:
+            args.musescore = env_path
+        else:
+            try:
+                args.musescore = get_musescore_path()
+                print(f"Auto-detected MuseScore path: {args.musescore}")
+            except FileNotFoundError as e:
+                print(str(e), file=sys.stderr)
+                sys.exit(1)
     
     # Perform the conversion
     success = convert_musicxml_to_pdf(input_mxml=args.input, output_pdf=args.output, musescore_path=args.musescore)
