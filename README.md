@@ -48,6 +48,8 @@ Read this before planning work around the pipeline.
   this repository.
 - **Late-breaking demo:** *Bring Your Own Music: Towards Community-Built, On-Demand Benchmarks of
   MLLM Music Perception*, submitted to the ISMIR 2026 Late-Breaking Demo track.
+- **[Online demo](https://tomsouri.github.io/MusICA-MetaBench/)** — answer 20 generated benchmark
+  items yourself and see what the eight evaluated models answered. Source in [docs/](docs/).
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — how to add a question template, a dataset or a format.
   Contributions are welcome; making question templates fully modality-neutral is an open problem
   we would particularly like help with.
