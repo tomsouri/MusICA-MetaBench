@@ -26,7 +26,9 @@
   .lede { color: var(--muted); margin: 0 0 18px; }
   .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .bar .count { font-weight: 600; }
-  .bar .score { margin-left: auto; color: var(--muted); }
+  .bar .score { color: var(--muted); }
+  .bar .nav { margin: 0 0 0 auto; }
+  .bar .nav button { padding: 5px 12px; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
   .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   .tag { font-size: .8rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1.5px solid currentColor; }
@@ -39,6 +41,10 @@
   .stimulus pre { margin: 0; padding: 12px; max-height: 320px; overflow: auto; background: var(--bg);
                   border: 1px solid var(--line); border-radius: 6px; font-size: .82rem; line-height: 1.4; }
   .stimulus .note { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  .stimulus .source { font-size: .72rem; color: var(--muted); margin: 4px 0 0; overflow-wrap: anywhere; }
+  .options .truth { font-size: .85rem; font-style: italic; color: var(--muted); margin: -4px 0 0 14px; }
+  .why { margin: 6px 0 0; }
+  .why p { margin: 6px 0 0; font-size: .95rem; }
   .options { display: grid; gap: 8px; }
   .options button { text-align: left; font: inherit; color: inherit; background: var(--panel); cursor: pointer;
                     border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 14px; }
@@ -80,6 +86,10 @@
   <div class="bar">
     <span class="count" id="count"></span>
     <span class="score" id="score"></span>
+    <span class="nav">
+      <button class="secondary prev">&larr; Previous</button>
+      <button class="next">Next &rarr;</button>
+    </span>
   </div>
 
   <div class="panel">
@@ -90,6 +100,7 @@
 
     <div id="reveal" hidden>
       <div class="verdict" id="verdict"></div>
+      <details class="why" id="why"><summary>Why this item was selected</summary><p id="why-text"></p></details>
       <h2 id="models-heading"></h2>
       <table><tbody id="models"></tbody></table>
       <p class="feedback">Something wrong with this item or with how a model's answer was evaluated?
@@ -99,8 +110,8 @@
   </div>
 
   <div class="nav">
-    <button class="secondary" id="prev">&larr; Previous</button>
-    <button id="next">Next &rarr;</button>
+    <button class="secondary prev">&larr; Previous</button>
+    <button class="next">Next &rarr;</button>
   </div>
 
   <footer>
@@ -169,14 +180,19 @@ function render() {
     media = el("pre", { textContent: item.abc });
   }
   $("stimulus").replaceChildren(media, el("p", { className: "note", textContent: MODALITY[item.modality][1] }));
+  if (item.modality === "visual") $("stimulus").append(el("p", { className: "source" }, "source: ",
+    el("a", { href: item.stimulus, target: "_blank", rel: "noopener", textContent: item.stimulus })));
 
   const picked = chosen[pos];
-  $("options").replaceChildren(...item.options.map((option) => {
+  $("options").replaceChildren(...item.options.flatMap((option) => {
     const button = el("button", { textContent: option, disabled: picked !== undefined });
     if (picked !== undefined && letter(option) === item.correct) button.className = "right";
     else if (letter(option) === picked) button.className = "wrong";
     button.onclick = () => { chosen[pos] = letter(option); render(); };
-    return button;
+    // "none of the other options" was correct: after the reveal, say what the answer actually is
+    return picked !== undefined && item.truth && letter(option) === item.correct
+      ? [button, el("p", { className: "truth", textContent: `The answer that is missing from the options: ${item.truth}` })]
+      : [button];
   }));
 
   $("reveal").hidden = picked === undefined;
@@ -185,6 +201,9 @@ function render() {
     $("verdict").className = "verdict " + (right ? "ok" : "bad");
     $("verdict").textContent = right ? `Correct: ${item.correct}.`
       : `Not this time. You chose ${picked}; the ground truth is ${item.correct}.`;
+    $("why").open = false;
+    $("why").hidden = !item.why;
+    $("why-text").textContent = item.why;
     $("models-heading").textContent =
       `${item.answers.filter((a) => a.correct).length} of ${item.answers.length} models answered correctly`;
     $("models").replaceChildren(...item.answers.map((a) => el("tr", {},
@@ -199,12 +218,13 @@ function render() {
       `Question: ${item.question}\nOptions: ${item.options.join("; ")}\nGround truth: ${item.correct}\n\n` +
       "What is wrong (which model, if it concerns a model's answer):\n");
   }
-  $("prev").disabled = pos === 0;
-  $("next").disabled = pos === items.length - 1;
+  document.querySelectorAll(".prev").forEach((b) => { b.disabled = pos === 0; });
+  document.querySelectorAll(".next").forEach((b) => { b.disabled = pos === items.length - 1; });
 }
 
-$("prev").onclick = () => { pos--; render(); window.scrollTo(0, 0); };
-$("next").onclick = () => { pos++; render(); window.scrollTo(0, 0); };
+const go = (step) => () => { pos += step; render(); window.scrollTo(0, 0); };
+document.querySelectorAll(".prev").forEach((b) => { b.onclick = go(-1); });
+document.querySelectorAll(".next").forEach((b) => { b.onclick = go(1); });
 feedbackLinks($("thoughts-issue"), $("thoughts-mail"), "Feedback", "");
 
 fetch("items.json").then((r) => r.json()).then((data) => { items = data; render(); })

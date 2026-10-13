@@ -1,0 +1,21 @@
+item_id	why_selected
+74b358ef-7970-5288-9e6f-32cc8cfa0778	Opens the demo: counting one pitch in one voice by ear is hard for people too. No model answered correctly from the recording. The next two items ask the same question as text and as a score image.
+52391966-16cf-57a5-b7e1-eb0a28dc1934	The same question as item 1, now as ABC notation: all eight models are correct. For a person, reading ABC is possible but slow.
+09690d02-132a-5b87-9322-c59a1c724bdc	The same question as items 1 and 2, as a score image. For most people this is the easiest of the three modalities; only one model was correct. The true count was not among the options here.
+7e6d262f-34d7-5c95-b156-73bd3e9921a6	Looks very simple: find the 18th note of one voice in the text. Yet only four of the eight models were correct.
+481dfb3b-de68-5b4b-a9b2-65c958619462	A question that is very hard to answer by ear. The next item asks the same from the score image.
+80657b4a-9254-518c-b7f2-5f92695ce9b0	The same question as item 5, as a score image: a person reads the answer off the first notes of the tenor line. Half of the models were still wrong.
+5962d0df-51a8-5ea5-b260-465cdf580c66	An easy item: seven of the eight models answered correctly from ABC notation.
+671aef0c-d474-5f9a-ab99-f174885a0378	Hard from audio, easy from text: one model was correct from the recording. The next two items ask the same question as text and as a score image.
+bc1133a1-171a-5376-95eb-75dd0d661f48	The same question as item 8, as ABC notation: all eight models are correct.
+4a31057f-034a-592b-bd61-22afc3323576	The same question as items 8 and 9, as a score image, probably the easiest modality for a person. Half of the models were correct.
+0e2d8c0d-5022-58a7-87ed-e50d56e76797	An example of the harmony questions: the relative major or minor of the piece's key, from the recording.
+e620dfa8-71b1-57c1-8cff-1a1ebe39fc24	The same question as item 11, as a score image, where the key signature can be read directly. Seven of the eight models were correct.
+e1bb1893-f9e7-5b44-b92b-d4aa4c9aa1ef	Reading a score image: counting one pitch in one voice. Half of the models were correct.
+f93cd8b9-ebed-5fed-8b81-82ddfd429774	Reading a score image: seven of the eight models were correct.
+63892194-70f2-5e03-bedd-ffa02f8a55e3	A proportion question that is hard by ear: no model was correct from the recording. The next two items ask the same question as text and as a score image.
+08a53120-ddec-5969-a3cf-46bad1e1bc33	The same question as item 15, as ABC notation: six of the eight models were correct.
+1bf5f20d-8751-5edc-a1bd-ece619970428	The same question as items 15 and 16, as a score image, probably the easiest modality for a person. No model was correct.
+0d0d6776-902a-52cb-8a9a-b8263640afc0	Audio is not always the hardest: seven of the eight models named this note length correctly from the recording. The next item asks the same from the score image.
+6b292bc4-2bb5-5056-9198-562a79836eed	The same question as item 18, as a score image: seven of the eight models were correct. Does this mean the models read note lengths from an image well?
+068bbb56-130d-518f-9b73-fc220c8d57ed	Some items require counting far: the 52nd chord of the piece. Three of the eight models were correct.
