@@ -24,6 +24,10 @@
   h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 6px; }
   a { color: var(--accent); }
   .lede { color: var(--muted); margin: 0 0 18px; }
+  .intro { margin-top: 14px; }
+  .intro h2:first-child { margin-top: 0; }
+  .intro p, .intro ul, .intro ol { margin: 0 0 10px; }
+  .intro li { margin: 0 0 4px; }
   .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .bar .count { font-weight: 600; }
   .bar .score { color: var(--muted); }
@@ -79,9 +83,34 @@
 <body>
 <main>
   <h1>Bring Your Own Music: try the generated benchmark yourself</h1>
-  <p class="lede">20 of the 300 multiple-choice items that MusICA-MetaBench generated from the ChoraleBricks
-    dataset. Answer each one, then see the ground truth and what eight multimodal LLMs answered when
-    given the same piece and the same question.</p>
+  <section class="panel intro" id="intro">
+    <h2>What you will see</h2>
+    <p><strong>20 of the 300 multiple-choice items</strong> that MusICA-MetaBench generated from the ChoraleBricks
+      dataset. For each one you get the same piece and the same question that eight multimodal LLMs were given.</p>
+    <h2>Why these 20</h2>
+    <p>We picked them by hand to be diverse:</p>
+    <ul>
+      <li>items that <strong>all models</strong> answered correctly, items that <strong>no model</strong> did,
+        and items where the models <strong>disagree</strong>;</li>
+      <li>the same question about the same piece as an <strong>audio recording</strong>, as
+        <strong>ABC notation</strong> and as a <strong>score image</strong>, so you can compare the modalities;</li>
+      <li>different kinds of questions: pitch, interval, rhythm, temporal proportion and harmony.</li>
+    </ul>
+    <h2>How it works</h2>
+    <ol>
+      <li>Listen, read or look, and pick one of the five options.</li>
+      <li>See the ground truth and what each model answered, with its raw response.</li>
+      <li>Open &ldquo;Why this item was selected&rdquo; to see what the item shows.</li>
+    </ol>
+    <p>This page stores and sends nothing; your answers are gone when you reload it.
+      See a problem? <a class="mail">Write us an email</a>.
+      Paper: <a href="https://arxiv.org/abs/2607.06015">arXiv:2607.06015</a>,
+      code: <a href="https://github.com/tomsouri/MusICA-MetaBench">GitHub</a>.</p>
+    <div class="nav"><span></span><button class="next" id="start" disabled>Start &rarr;</button></div>
+  </section>
+
+  <div id="quiz" hidden>
+  <p class="lede">Answer each item, then compare with what eight multimodal LLMs answered.</p>
 
   <div class="bar">
     <span class="count" id="count"></span>
@@ -103,9 +132,8 @@
       <details class="why" id="why"><summary>Why this item was selected</summary><p id="why-text"></p></details>
       <h2 id="models-heading"></h2>
       <table><tbody id="models"></tbody></table>
-      <p class="feedback">Something wrong with this item or with how a model's answer was evaluated?
-        <a id="report-issue" target="_blank" rel="noopener">Report a problem with this item</a>
-        or <a id="report-mail">email us</a>.</p>
+      <p class="feedback">See a problem with this item or with how a model's answer was evaluated?
+        <a id="report-mail">Write us an email</a>.</p>
     </div>
   </div>
 
@@ -113,11 +141,11 @@
     <button class="secondary prev">&larr; Previous</button>
     <button class="next">Next &rarr;</button>
   </div>
+  </div>
 
   <footer>
-    <p><a id="thoughts-issue" target="_blank" rel="noopener">Share your thoughts</a> about the demo or the
-      benchmark, or <a id="thoughts-mail">email us</a>. This page stores and sends nothing; the links open a
-      GitHub issue or your mail client.</p>
+    <p>See a problem? <a class="mail">Write us an email</a>. This page stores and sends nothing; the link
+      opens your mail client.</p>
     <p>Code and contribution instructions:
       <a href="https://github.com/tomsouri/MusICA-MetaBench">github.com/tomsouri/MusICA-MetaBench</a>.
       Preprint: <a href="https://arxiv.org/abs/2607.06015">arXiv:2607.06015</a>.</p>
@@ -130,7 +158,6 @@
 </main>
 
 <script>
-const REPO_ISSUES = "https://github.com/tomsouri/MusICA-MetaBench/issues/new";
 const EMAIL = "sourada@ufal.mff.cuni.cz";
 const MODALITY = {
   audio: ["Audio recording", "The models received this recording."],
@@ -144,16 +171,17 @@ const el = (tag, props = {}, ...children) => {
   node.append(...children);
   return node;
 };
-const feedbackLinks = (issueLink, mailLink, title, body) => {
-  const q = (s) => encodeURIComponent(s);
-  issueLink.href = `${REPO_ISSUES}?labels=demo-feedback&title=${q("[demo] " + title)}&body=${q(body)}`;
-  mailLink.href = `mailto:${EMAIL}?subject=${q("[MusICA-MetaBench demo] " + title)}&body=${q(body)}`;
-};
+const mailto = (title, body) => `mailto:${EMAIL}?subject=${encodeURIComponent("[MusICA-MetaBench demo] " + title)}` +
+  `&body=${encodeURIComponent(body)}`;
 
-let items = [], pos = 0;
+let items = [], pos = -1;   // -1 is the intro page
 const chosen = {};   // item index -> letter the visitor picked; kept in memory only
 
 function render() {
+  $("intro").hidden = pos >= 0;
+  $("quiz").hidden = pos < 0;
+  $("start").disabled = !items.length;
+  if (pos < 0) return;
   const item = items[pos];
   const letter = (option) => option[1];           // "(A) text" -> "A"
   $("count").textContent = `Item ${pos + 1} of ${items.length}`;
@@ -213,22 +241,22 @@ function render() {
       el("td", {}, el("details", {},
         el("summary", { textContent: "Raw response" }),
         el("pre", { textContent: a.response || "(empty response)" }))))));
-    feedbackLinks($("report-issue"), $("report-mail"), `Item ${pos + 1}: ${item.question}`,
+    $("report-mail").href = mailto(`Item ${pos + 1}: ${item.question}`,
       `Item id: ${item.item_id}\nPiece: ${item.piece_id}\nModality: ${item.modality}\n` +
       `Question: ${item.question}\nOptions: ${item.options.join("; ")}\nGround truth: ${item.correct}\n\n` +
       "What is wrong (which model, if it concerns a model's answer):\n");
   }
-  document.querySelectorAll(".prev").forEach((b) => { b.disabled = pos === 0; });
+  document.querySelectorAll(".prev").forEach((b) => { b.disabled = pos < 0; });
   document.querySelectorAll(".next").forEach((b) => { b.disabled = pos === items.length - 1; });
 }
 
 const go = (step) => () => { pos += step; render(); window.scrollTo(0, 0); };
 document.querySelectorAll(".prev").forEach((b) => { b.onclick = go(-1); });
 document.querySelectorAll(".next").forEach((b) => { b.onclick = go(1); });
-feedbackLinks($("thoughts-issue"), $("thoughts-mail"), "Feedback", "");
+document.querySelectorAll("a.mail").forEach((a) => { a.href = mailto("Feedback", ""); });
 
 fetch("items.json").then((r) => r.json()).then((data) => { items = data; render(); })
-  .catch(() => { $("question").textContent = "Could not load items.json. Serve this folder over HTTP."; });
+  .catch(() => $("intro").append(el("p", { className: "bad", textContent: "Could not load items.json. Serve this folder over HTTP." })));
 </script>
 </body>
 </html>
