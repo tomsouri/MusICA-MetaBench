@@ -69,6 +69,7 @@
   details pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; padding: 10px; max-height: 300px;
                 overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
                 font-size: .8rem; line-height: 1.4; }
+  .addr { user-select: all; }
   .feedback { margin-top: 16px; font-size: .9rem; color: var(--muted); }
   .nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
   .nav button { font: inherit; padding: 9px 18px; border-radius: 8px; border: 1.5px solid var(--accent);
@@ -103,7 +104,7 @@
       <li>Open &ldquo;Why this item was selected&rdquo; to see what the item shows.</li>
     </ol>
     <p>This page stores and sends nothing; your answers are gone when you reload it.
-      See a problem? <a class="mail">Write us an email</a>.
+      See a problem? <a class="mail">Write us an email</a> (<span class="addr">sourada@ufal.mff.cuni.cz</span>).
       Paper: <a href="https://arxiv.org/abs/2607.06015">arXiv:2607.06015</a>,
       code: <a href="https://github.com/tomsouri/MusICA-MetaBench">GitHub</a>.</p>
     <div class="nav"><span></span><button class="next" id="start" disabled>Start &rarr;</button></div>
@@ -133,7 +134,7 @@
       <h2 id="models-heading"></h2>
       <table><tbody id="models"></tbody></table>
       <p class="feedback">See a problem with this item or with how a model's answer was evaluated?
-        <a id="report-mail">Write us an email</a>.</p>
+        <a id="report-mail">Write us an email</a> (<span class="addr">sourada@ufal.mff.cuni.cz</span>).</p>
     </div>
   </div>
 
@@ -156,13 +157,14 @@
         with its ground-truth extractor? <a class="mail" data-subject="Collaboration">Write us</a>, or see
         <a href="https://github.com/tomsouri/MusICA-MetaBench/blob/main/CONTRIBUTING.md">how to contribute</a>.</li>
     </ul>
+    <p>If the links do not open your mail client, write to <span class="addr">sourada@ufal.mff.cuni.cz</span>.</p>
     <p>Bring your own music.</p>
     <div class="nav"><button class="secondary prev">&larr; Previous</button>
       <button class="secondary" id="restart">Back to the start</button></div>
   </section>
 
   <footer>
-    <p>See a problem? <a class="mail">Write us an email</a>. This page stores and sends nothing; the link
+    <p>See a problem? <a class="mail">Write us an email</a> (<span class="addr">sourada@ufal.mff.cuni.cz</span>). This page stores and sends nothing; the email link
       opens your mail client.</p>
     <p>Code and contribution instructions:
       <a href="https://github.com/tomsouri/MusICA-MetaBench">github.com/tomsouri/MusICA-MetaBench</a>.
