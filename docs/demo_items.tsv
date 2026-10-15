@@ -1,9 +1,9 @@
 item_id	why_selected
 74b358ef-7970-5288-9e6f-32cc8cfa0778	Opens the demo: counting one pitch in one voice by ear is hard for people too. No model answered correctly from the recording. The next item asks the same question as text; the last item of the demo asks it as a score image.
 52391966-16cf-57a5-b7e1-eb0a28dc1934	The same question as the previous item, now as ABC notation: all eight models are correct. For a person, reading ABC is possible but slow.
-80657b4a-9254-518c-b7f2-5f92695ce9b0	An interval in one voice, from a score image: a person reads the answer off the first notes of the tenor line. Half of the models were still wrong. Two items later, the same question comes as a recording.
+80657b4a-9254-518c-b7f2-5f92695ce9b0	An interval in one voice, from a score image: a person reads the answer off the first notes of the tenor line. Half of the models were still wrong. The next item asks the same question from the recording.
+481dfb3b-de68-5b4b-a9b2-65c958619462	The same question as the previous item, now from the recording: very hard to answer by ear.
 7e6d262f-34d7-5c95-b156-73bd3e9921a6	Looks very simple: find the 18th note of one voice in the text. Yet only four of the eight models were correct.
-481dfb3b-de68-5b4b-a9b2-65c958619462	The same question as the score-image item two items earlier, now from the recording: very hard to answer by ear.
 5962d0df-51a8-5ea5-b260-465cdf580c66	An easy item: seven of the eight models answered correctly from ABC notation.
 671aef0c-d474-5f9a-ab99-f174885a0378	Hard from audio, easy from text: one model was correct from the recording. The next two items ask the same question as text and as a score image.
 bc1133a1-171a-5376-95eb-75dd0d661f48	The same question as the previous item, as ABC notation: all eight models are correct.
