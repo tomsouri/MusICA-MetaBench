@@ -10,11 +10,12 @@ Export the quiz items of the online demo (docs/index.html) to docs/items.json.
 
 Reads the per-item inference logs (logs.tsv) of the eight models reported in the paper
 for the ChoraleBricks instance benchmarks/qs_per_subcat_20/seed_52.tsv, checks that each
-log reproduces the result file committed under results/, selects about 20 items and
-writes them in the order the demo shows them.
+log reproduces the result file committed under results/, and writes the items listed in
+docs/demo_items.tsv (hand-picked, in the order the demo shows them, each with the reason
+it was selected). With --auto the items are selected by rule instead (see select()).
 
 Usage (from the repository root):
-    python docs/export_demo.py <dir containing the run_*_normal-<model>-20-52 directories>
+    python docs/export_demo.py <dir containing the run_*_normal-<model>-20-52 directories> [--auto]
 """
 
 import collections
@@ -29,6 +30,7 @@ csv.field_size_limit(sys.maxsize)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
 BENCHMARK = os.path.join(ROOT, "benchmarks", "qs_per_subcat_20", "seed_52.tsv")
+SELECTION = os.path.join(DOCS, "demo_items.tsv")   # columns: item_id, why_selected
 # Score images are shown from the ChoraleBricks website and not copied here: its sheet music
 # is "published with the kind permission of the rights holder", unlike the CC BY 4.0 audio.
 SCORE_URLS = os.path.join(ROOT, "data", "original", "chorale-bricks", "list-of-pngs.txt")
@@ -146,7 +148,7 @@ def select(bench, logs):
             + [*pairs[2]] + singles[2 * third:]), pairs, n_correct
 
 
-def export_item(r, logs, score_urls):
+def export_item(r, logs, score_urls, why):
     answers = []
     for model, name in MODELS.items():
         log = logs[model][r["item_id"]]
@@ -164,7 +166,11 @@ def export_item(r, logs, score_urls):
         "options": json.loads(r["labeled_final_options"]),
         "correct": r["label_of_final_correct_option"],
         "answers": answers,
+        "why": why,
     }
+    if r["is_nota_correct"] == "1":
+        # the correct option is "none of the other options"; this is the answer it stands for
+        item["truth"] = r["ground_truth"]
     if r["modality"] == "audio":
         item["stimulus"] = f"assets/{r['piece_id']}/audio.m4a"
     elif r["modality"] == "visual":
@@ -177,13 +183,20 @@ def export_item(r, logs, score_urls):
     return item
 
 
-def main(logs_dir):
+def main(logs_dir, auto=False):
     bench = read_tsv(BENCHMARK)
     logs = load_logs(logs_dir, [r["item_id"] for r in bench])
-    sequence, pairs, n_correct = select(bench, logs)
+    if auto:
+        sequence, pairs, n_correct = select(bench, logs)
+        why = {}
+    else:
+        by_id = {r["item_id"]: r for r in bench}
+        why = {s["item_id"]: s["why_selected"] for s in read_tsv(SELECTION)}
+        sequence, pairs = [by_id[i] for i in why], []
+        n_correct = {i: sum(logs[m][i]["is_correct"] == "True" for m in MODELS) for i in why}
     with open(SCORE_URLS, encoding="utf-8") as f:
         score_urls = {url.split("/")[-3]: url for url in f.read().split()}
-    items = [export_item(r, logs, score_urls) for r in sequence]
+    items = [export_item(r, logs, score_urls, why.get(r["item_id"], "")) for r in sequence]
 
     # Self-check of the selection.
     assert len(items) == N_TOTAL == len({i["item_id"] for i in items})
@@ -191,11 +204,13 @@ def main(logs_dir):
         assert len(i["options"]) == 5 and i["correct"] in "ABCDE"
         assert all(a["answer"] in ("A", "B", "C", "D", "E", "UNPARSABLE", "MODEL_ERROR")
                    for a in i["answers"]) and len(i["answers"]) == len(MODELS)
+        assert auto or i["why"], f"{i['item_id']}: no why_selected in {SELECTION}"
     ids = [i["item_id"] for i in items]
-    assert len(pairs) == N_PAIRS and ids[0] == pairs[0][0]["item_id"]
-    for audio, symbolic in pairs:
-        assert ids.index(symbolic["item_id"]) == ids.index(audio["item_id"]) + 1
-    assert sum(n_correct[i] >= EASY_MIN_CORRECT for i in ids) >= N_EASY
+    if auto:
+        assert len(pairs) == N_PAIRS and ids[0] == pairs[0][0]["item_id"]
+        for audio, symbolic in pairs:
+            assert ids.index(symbolic["item_id"]) == ids.index(audio["item_id"]) + 1
+        assert sum(n_correct[i] >= EASY_MIN_CORRECT for i in ids) >= N_EASY
     assert {"relative", "absolute"} <= {i["rel_abs"] for i in items}
     missing = [i["stimulus"] for i in items
                if i["modality"] == "audio" and not os.path.exists(os.path.join(DOCS, i["stimulus"]))]
@@ -206,7 +221,7 @@ def main(logs_dir):
     pair_ids = {r["item_id"] for p in pairs for r in p}
     print(f"\n{'#':>2}  {'kind':5} {'modality':8} {'skill':22} {'ok/8':>4}  piece / question")
     for n, i in enumerate(items, 1):
-        kind = "pair" if i["item_id"] in pair_ids else (
+        kind = "pair" if i["item_id"] in pair_ids else "pick" if not auto else (
             "easy" if n_correct[i["item_id"]] >= EASY_MIN_CORRECT else "split")
         print(f"{n:>2}  {kind:5} {i['modality']:8} {i['skill']:22} {n_correct[i['item_id']]:>4}  "
               f"{i['piece_id']}: {i['question']}")
@@ -216,4 +231,4 @@ def main(logs_dir):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], auto="--auto" in sys.argv[2:])

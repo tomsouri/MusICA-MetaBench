@@ -24,9 +24,15 @@
   h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 6px; }
   a { color: var(--accent); }
   .lede { color: var(--muted); margin: 0 0 18px; }
+  .intro { margin-top: 14px; }
+  .intro h2:first-child { margin-top: 0; }
+  .intro p, .intro ul, .intro ol { margin: 0 0 10px; }
+  .intro li { margin: 0 0 4px; }
   .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
   .bar .count { font-weight: 600; }
-  .bar .score { margin-left: auto; color: var(--muted); }
+  .bar .score { color: var(--muted); }
+  .bar .nav { margin: 0 0 0 auto; }
+  .bar .nav button { padding: 5px 12px; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
   .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   .tag { font-size: .8rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1.5px solid currentColor; }
@@ -39,6 +45,10 @@
   .stimulus pre { margin: 0; padding: 12px; max-height: 320px; overflow: auto; background: var(--bg);
                   border: 1px solid var(--line); border-radius: 6px; font-size: .82rem; line-height: 1.4; }
   .stimulus .note { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  .stimulus .source { font-size: .72rem; color: var(--muted); margin: 4px 0 0; overflow-wrap: anywhere; }
+  .options .truth { font-size: .85rem; font-style: italic; color: var(--muted); margin: -4px 0 0 14px; }
+  .why { margin: 6px 0 0; }
+  .why p { margin: 6px 0 0; font-size: .95rem; }
   .options { display: grid; gap: 8px; }
   .options button { text-align: left; font: inherit; color: inherit; background: var(--panel); cursor: pointer;
                     border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 14px; }
@@ -73,13 +83,42 @@
 <body>
 <main>
   <h1>Bring Your Own Music: try the generated benchmark yourself</h1>
-  <p class="lede">20 of the 300 multiple-choice items that MusICA-MetaBench generated from the ChoraleBricks
-    dataset. Answer each one, then see the ground truth and what eight multimodal LLMs answered when
-    given the same piece and the same question.</p>
+  <section class="panel intro" id="intro">
+    <h2>What you will see</h2>
+    <p><strong>20 of the 300 multiple-choice items</strong> that MusICA-MetaBench generated from the ChoraleBricks
+      dataset. For each one you get the same piece and the same question that eight multimodal LLMs were given.</p>
+    <h2>Why these 20</h2>
+    <p>We picked them by hand to be diverse:</p>
+    <ul>
+      <li>items that <strong>all models</strong> answered correctly, items that <strong>no model</strong> did,
+        and items where the models <strong>disagree</strong>;</li>
+      <li>the same question about the same piece as an <strong>audio recording</strong>, as
+        <strong>ABC notation</strong> and as a <strong>score image</strong>, so you can compare the modalities;</li>
+      <li>different kinds of questions: pitch, interval, rhythm, temporal proportion and harmony.</li>
+    </ul>
+    <h2>How it works</h2>
+    <ol>
+      <li>Listen, read or look, and pick one of the five options.</li>
+      <li>See the ground truth and what each model answered, with its raw response.</li>
+      <li>Open &ldquo;Why this item was selected&rdquo; to see what the item shows.</li>
+    </ol>
+    <p>This page stores and sends nothing; your answers are gone when you reload it.
+      See a problem? <a class="mail">Write us an email</a>.
+      Paper: <a href="https://arxiv.org/abs/2607.06015">arXiv:2607.06015</a>,
+      code: <a href="https://github.com/tomsouri/MusICA-MetaBench">GitHub</a>.</p>
+    <div class="nav"><span></span><button class="next" id="start" disabled>Start &rarr;</button></div>
+  </section>
+
+  <div id="quiz" hidden>
+  <p class="lede">Answer each item, then compare with what eight multimodal LLMs answered.</p>
 
   <div class="bar">
     <span class="count" id="count"></span>
     <span class="score" id="score"></span>
+    <span class="nav">
+      <button class="secondary prev">&larr; Previous</button>
+      <button class="next">Next &rarr;</button>
+    </span>
   </div>
 
   <div class="panel">
@@ -90,23 +129,41 @@
 
     <div id="reveal" hidden>
       <div class="verdict" id="verdict"></div>
+      <details class="why" id="why"><summary>Why this item was selected</summary><p id="why-text"></p></details>
       <h2 id="models-heading"></h2>
       <table><tbody id="models"></tbody></table>
-      <p class="feedback">Something wrong with this item or with how a model's answer was evaluated?
-        <a id="report-issue" target="_blank" rel="noopener">Report a problem with this item</a>
-        or <a id="report-mail">email us</a>.</p>
+      <p class="feedback">See a problem with this item or with how a model's answer was evaluated?
+        <a id="report-mail">Write us an email</a>.</p>
     </div>
   </div>
 
   <div class="nav">
-    <button class="secondary" id="prev">&larr; Previous</button>
-    <button id="next">Next &rarr;</button>
+    <button class="secondary prev">&larr; Previous</button>
+    <button class="next">Next &rarr;</button>
+  </div>
   </div>
 
+  <section class="panel intro" id="end" hidden>
+    <h2>Thank you for trying the demo</h2>
+    <p id="end-score"></p>
+    <p>We would like to hear from you, about anything from a single item to working together:</p>
+    <ul>
+      <li><strong>Question formulation</strong>: was a question unclear, ambiguous or misleading?
+        <a class="mail" data-subject="Question formulation">Write us</a>.</li>
+      <li><strong>Question selection</strong>: are these 20 items a good showcase, are the skills we test the right
+        ones, and which perceptual skills are we missing? <a class="mail" data-subject="Question selection">Write us</a>.</li>
+      <li><strong>Collaboration</strong>: would you add a dataset of your own music, or a question template
+        with its ground-truth extractor? <a class="mail" data-subject="Collaboration">Write us</a>, or see
+        <a href="https://github.com/tomsouri/MusICA-MetaBench/blob/main/CONTRIBUTING.md">how to contribute</a>.</li>
+    </ul>
+    <p>Bring your own music.</p>
+    <div class="nav"><button class="secondary prev">&larr; Previous</button>
+      <button class="secondary" id="restart">Back to the start</button></div>
+  </section>
+
   <footer>
-    <p><a id="thoughts-issue" target="_blank" rel="noopener">Share your thoughts</a> about the demo or the
-      benchmark, or <a id="thoughts-mail">email us</a>. This page stores and sends nothing; the links open a
-      GitHub issue or your mail client.</p>
+    <p>See a problem? <a class="mail">Write us an email</a>. This page stores and sends nothing; the link
+      opens your mail client.</p>
     <p>Code and contribution instructions:
       <a href="https://github.com/tomsouri/MusICA-MetaBench">github.com/tomsouri/MusICA-MetaBench</a>.
       Preprint: <a href="https://arxiv.org/abs/2607.06015">arXiv:2607.06015</a>.</p>
@@ -119,7 +176,6 @@
 </main>
 
 <script>
-const REPO_ISSUES = "https://github.com/tomsouri/MusICA-MetaBench/issues/new";
 const EMAIL = "sourada@ufal.mff.cuni.cz";
 const MODALITY = {
   audio: ["Audio recording", "The models received this recording."],
@@ -133,23 +189,26 @@ const el = (tag, props = {}, ...children) => {
   node.append(...children);
   return node;
 };
-const feedbackLinks = (issueLink, mailLink, title, body) => {
-  const q = (s) => encodeURIComponent(s);
-  issueLink.href = `${REPO_ISSUES}?labels=demo-feedback&title=${q("[demo] " + title)}&body=${q(body)}`;
-  mailLink.href = `mailto:${EMAIL}?subject=${q("[MusICA-MetaBench demo] " + title)}&body=${q(body)}`;
-};
+const mailto = (title, body) => `mailto:${EMAIL}?subject=${encodeURIComponent("[MusICA-MetaBench demo] " + title)}` +
+  `&body=${encodeURIComponent(body)}`;
 
-let items = [], pos = 0;
+let items = [], pos = -1;   // -1 is the intro page
 const chosen = {};   // item index -> letter the visitor picked; kept in memory only
 
 function render() {
+  const answered = Object.keys(chosen);
+  const nRight = answered.filter((i) => chosen[i] === items[i].correct).length;
+  $("intro").hidden = pos >= 0;
+  $("quiz").hidden = pos < 0 || pos >= items.length;
+  $("end").hidden = pos < items.length;   // the page after the last item
+  $("start").disabled = !items.length;
+  $("end-score").textContent = answered.length
+    ? `You answered ${nRight} of the ${answered.length} items you tried correctly.` : "";
+  if (pos < 0 || pos >= items.length) return;
   const item = items[pos];
   const letter = (option) => option[1];           // "(A) text" -> "A"
   $("count").textContent = `Item ${pos + 1} of ${items.length}`;
-  const answered = Object.keys(chosen);
-  $("score").textContent = answered.length
-    ? `You: ${answered.filter((i) => chosen[i] === items[i].correct).length} of ${answered.length} correct`
-    : "";
+  $("score").textContent = answered.length ? `You: ${nRight} of ${answered.length} correct` : "";
 
   $("tags").replaceChildren(
     el("span", { className: `tag ${item.modality}`, textContent: MODALITY[item.modality][0] }),
@@ -169,14 +228,19 @@ function render() {
     media = el("pre", { textContent: item.abc });
   }
   $("stimulus").replaceChildren(media, el("p", { className: "note", textContent: MODALITY[item.modality][1] }));
+  if (item.modality === "visual") $("stimulus").append(el("p", { className: "source" }, "source: ",
+    el("a", { href: item.stimulus, target: "_blank", rel: "noopener", textContent: item.stimulus })));
 
   const picked = chosen[pos];
-  $("options").replaceChildren(...item.options.map((option) => {
+  $("options").replaceChildren(...item.options.flatMap((option) => {
     const button = el("button", { textContent: option, disabled: picked !== undefined });
     if (picked !== undefined && letter(option) === item.correct) button.className = "right";
     else if (letter(option) === picked) button.className = "wrong";
     button.onclick = () => { chosen[pos] = letter(option); render(); };
-    return button;
+    // "none of the other options" was correct: after the reveal, say what the answer actually is
+    return picked !== undefined && item.truth && letter(option) === item.correct
+      ? [button, el("p", { className: "truth", textContent: `The answer that is missing from the options: ${item.truth}` })]
+      : [button];
   }));
 
   $("reveal").hidden = picked === undefined;
@@ -185,6 +249,9 @@ function render() {
     $("verdict").className = "verdict " + (right ? "ok" : "bad");
     $("verdict").textContent = right ? `Correct: ${item.correct}.`
       : `Not this time. You chose ${picked}; the ground truth is ${item.correct}.`;
+    $("why").open = false;
+    $("why").hidden = !item.why;
+    $("why-text").textContent = item.why;
     $("models-heading").textContent =
       `${item.answers.filter((a) => a.correct).length} of ${item.answers.length} models answered correctly`;
     $("models").replaceChildren(...item.answers.map((a) => el("tr", {},
@@ -194,21 +261,23 @@ function render() {
       el("td", {}, el("details", {},
         el("summary", { textContent: "Raw response" }),
         el("pre", { textContent: a.response || "(empty response)" }))))));
-    feedbackLinks($("report-issue"), $("report-mail"), `Item ${pos + 1}: ${item.question}`,
+    $("report-mail").href = mailto(`Item ${pos + 1}: ${item.question}`,
       `Item id: ${item.item_id}\nPiece: ${item.piece_id}\nModality: ${item.modality}\n` +
       `Question: ${item.question}\nOptions: ${item.options.join("; ")}\nGround truth: ${item.correct}\n\n` +
       "What is wrong (which model, if it concerns a model's answer):\n");
   }
-  $("prev").disabled = pos === 0;
-  $("next").disabled = pos === items.length - 1;
+  document.querySelectorAll(".prev").forEach((b) => { b.disabled = pos < 0; });
+  document.querySelectorAll(".next").forEach((b) => { b.disabled = pos >= items.length; });
 }
 
-$("prev").onclick = () => { pos--; render(); window.scrollTo(0, 0); };
-$("next").onclick = () => { pos++; render(); window.scrollTo(0, 0); };
-feedbackLinks($("thoughts-issue"), $("thoughts-mail"), "Feedback", "");
+const go = (step) => () => { pos += step; render(); window.scrollTo(0, 0); };
+document.querySelectorAll(".prev").forEach((b) => { b.onclick = go(-1); });
+document.querySelectorAll(".next").forEach((b) => { b.onclick = go(1); });
+$("restart").onclick = () => { pos = -1; render(); window.scrollTo(0, 0); };
+document.querySelectorAll("a.mail").forEach((a) => { a.href = mailto(a.dataset.subject || "Feedback", ""); });
 
 fetch("items.json").then((r) => r.json()).then((data) => { items = data; render(); })
-  .catch(() => { $("question").textContent = "Could not load items.json. Serve this folder over HTTP."; });
+  .catch(() => $("intro").append(el("p", { className: "bad", textContent: "Could not load items.json. Serve this folder over HTTP." })));
 </script>
 </body>
 </html>
