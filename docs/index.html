@@ -143,6 +143,24 @@
   </div>
   </div>
 
+  <section class="panel intro" id="end" hidden>
+    <h2>Thank you for trying the demo</h2>
+    <p id="end-score"></p>
+    <p>We would like to hear from you, about anything from a single item to working together:</p>
+    <ul>
+      <li><strong>Question formulation</strong>: was a question unclear, ambiguous or misleading?
+        <a class="mail" data-subject="Question formulation">Write us</a>.</li>
+      <li><strong>Question selection</strong>: are these 20 items a good showcase, are the skills we test the right
+        ones, and which perceptual skills are we missing? <a class="mail" data-subject="Question selection">Write us</a>.</li>
+      <li><strong>Collaboration</strong>: would you add a dataset of your own music, or a question template
+        with its ground-truth extractor? <a class="mail" data-subject="Collaboration">Write us</a>, or see
+        <a href="https://github.com/tomsouri/MusICA-MetaBench/blob/main/CONTRIBUTING.md">how to contribute</a>.</li>
+    </ul>
+    <p>Bring your own music.</p>
+    <div class="nav"><button class="secondary prev">&larr; Previous</button>
+      <button class="secondary" id="restart">Back to the start</button></div>
+  </section>
+
   <footer>
     <p>See a problem? <a class="mail">Write us an email</a>. This page stores and sends nothing; the link
       opens your mail client.</p>
@@ -178,17 +196,19 @@ let items = [], pos = -1;   // -1 is the intro page
 const chosen = {};   // item index -> letter the visitor picked; kept in memory only
 
 function render() {
+  const answered = Object.keys(chosen);
+  const nRight = answered.filter((i) => chosen[i] === items[i].correct).length;
   $("intro").hidden = pos >= 0;
-  $("quiz").hidden = pos < 0;
+  $("quiz").hidden = pos < 0 || pos >= items.length;
+  $("end").hidden = pos < items.length;   // the page after the last item
   $("start").disabled = !items.length;
-  if (pos < 0) return;
+  $("end-score").textContent = answered.length
+    ? `You answered ${nRight} of the ${answered.length} items you tried correctly.` : "";
+  if (pos < 0 || pos >= items.length) return;
   const item = items[pos];
   const letter = (option) => option[1];           // "(A) text" -> "A"
   $("count").textContent = `Item ${pos + 1} of ${items.length}`;
-  const answered = Object.keys(chosen);
-  $("score").textContent = answered.length
-    ? `You: ${answered.filter((i) => chosen[i] === items[i].correct).length} of ${answered.length} correct`
-    : "";
+  $("score").textContent = answered.length ? `You: ${nRight} of ${answered.length} correct` : "";
 
   $("tags").replaceChildren(
     el("span", { className: `tag ${item.modality}`, textContent: MODALITY[item.modality][0] }),
@@ -247,13 +267,14 @@ function render() {
       "What is wrong (which model, if it concerns a model's answer):\n");
   }
   document.querySelectorAll(".prev").forEach((b) => { b.disabled = pos < 0; });
-  document.querySelectorAll(".next").forEach((b) => { b.disabled = pos === items.length - 1; });
+  document.querySelectorAll(".next").forEach((b) => { b.disabled = pos >= items.length; });
 }
 
 const go = (step) => () => { pos += step; render(); window.scrollTo(0, 0); };
 document.querySelectorAll(".prev").forEach((b) => { b.onclick = go(-1); });
 document.querySelectorAll(".next").forEach((b) => { b.onclick = go(1); });
-document.querySelectorAll("a.mail").forEach((a) => { a.href = mailto("Feedback", ""); });
+$("restart").onclick = () => { pos = -1; render(); window.scrollTo(0, 0); };
+document.querySelectorAll("a.mail").forEach((a) => { a.href = mailto(a.dataset.subject || "Feedback", ""); });
 
 fetch("items.json").then((r) => r.json()).then((data) => { items = data; render(); })
   .catch(() => $("intro").append(el("p", { className: "bad", textContent: "Could not load items.json. Serve this folder over HTTP." })));
