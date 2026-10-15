@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MusICA-MetaBench demo</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --panel: #ffffff; --ink: #1d1f24; --muted: #5d6470; --line: #dcdad3;
+    --accent: #1f5fa8; --ok: #1b7a3d; --ok-bg: #e3f3e8; --bad: #b3261e; --bad-bg: #fbe6e4;
+    --audio: #8a4b00; --visual: #5b3a9b; --symbolic: #0d6b6b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171b; --panel: #1e2126; --ink: #e8e9ec; --muted: #a2a8b3; --line: #353a42;
+      --accent: #7fb2ee; --ok: #6fd08f; --ok-bg: #173323; --bad: #ff8a80; --bad-bg: #3a1b19;
+      --audio: #f0b060; --visual: #b9a0f0; --symbolic: #6fd0d0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 6px; }
+  a { color: var(--accent); }
+  .lede { color: var(--muted); margin: 0 0 18px; }
+  .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .bar .count { font-weight: 600; }
+  .bar .score { margin-left: auto; color: var(--muted); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tag { font-size: .8rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1.5px solid currentColor; }
+  .tag.audio { color: var(--audio); } .tag.visual { color: var(--visual); } .tag.symbolic { color: var(--symbolic); }
+  .tag.plain { color: var(--muted); font-weight: 500; }
+  .question { font-size: 1.2rem; font-weight: 600; margin: 4px 0 14px; }
+  .stimulus { margin: 0 0 16px; }
+  .stimulus audio { width: 100%; }
+  .stimulus img { max-width: 100%; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
+  .stimulus pre { margin: 0; padding: 12px; max-height: 320px; overflow: auto; background: var(--bg);
+                  border: 1px solid var(--line); border-radius: 6px; font-size: .82rem; line-height: 1.4; }
+  .stimulus .note { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  .options { display: grid; gap: 8px; }
+  .options button { text-align: left; font: inherit; color: inherit; background: var(--panel); cursor: pointer;
+                    border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  .options button:hover:enabled, .options button:focus-visible { border-color: var(--accent); }
+  .options button:disabled { cursor: default; }
+  .options button.right { border-color: var(--ok); background: var(--ok-bg); }
+  .options button.wrong { border-color: var(--bad); background: var(--bad-bg); }
+  .verdict { font-weight: 600; margin: 16px 0 4px; }
+  .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
+  h2 { font-size: 1.05rem; margin: 18px 0 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 7px 6px; border-top: 1px solid var(--line); vertical-align: top; }
+  td.model { font-weight: 600; white-space: nowrap; }
+  td.ans { white-space: nowrap; }
+  td:last-child { width: 100%; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  details summary { cursor: pointer; color: var(--accent); font-size: .9rem; }
+  details pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; padding: 10px; max-height: 300px;
+                overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+                font-size: .8rem; line-height: 1.4; }
+  .feedback { margin-top: 16px; font-size: .9rem; color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
+  .nav button { font: inherit; padding: 9px 18px; border-radius: 8px; border: 1.5px solid var(--accent);
+                background: var(--accent); color: var(--bg); cursor: pointer; font-weight: 600; }
+  .nav button.secondary { background: transparent; color: var(--accent); }
+  .nav button:disabled { opacity: .35; cursor: default; }
+  footer { margin-top: 28px; font-size: .85rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+  footer p { margin: 0 0 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bring Your Own Music: try the generated benchmark yourself</h1>
+  <p class="lede">20 of the 300 multiple-choice items that MusICA-MetaBench generated from the ChoraleBricks
+    dataset. Answer each one, then see the ground truth and what eight multimodal LLMs answered when
+    given the same piece and the same question.</p>
+
+  <div class="bar">
+    <span class="count" id="count"></span>
+    <span class="score" id="score"></span>
+  </div>
+
+  <div class="panel">
+    <div class="tags" id="tags"></div>
+    <div class="question" id="question"></div>
+    <div class="stimulus" id="stimulus"></div>
+    <div class="options" id="options"></div>
+
+    <div id="reveal" hidden>
+      <div class="verdict" id="verdict"></div>
+      <h2 id="models-heading"></h2>
+      <table><tbody id="models"></tbody></table>
+      <p class="feedback">Something wrong with this item or with how a model's answer was evaluated?
+        <a id="report-issue" target="_blank" rel="noopener">Report a problem with this item</a>
+        or <a id="report-mail">email us</a>.</p>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="secondary" id="prev">&larr; Previous</button>
+    <button id="next">Next &rarr;</button>
+  </div>
+
+  <footer>
+    <p><a id="thoughts-issue" target="_blank" rel="noopener">Share your thoughts</a> about the demo or the
+      benchmark, or <a id="thoughts-mail">email us</a>. This page stores and sends nothing; the links open a
+      GitHub issue or your mail client.</p>
+    <p>Code and contribution instructions:
+      <a href="https://github.com/tomsouri/MusICA-MetaBench">github.com/tomsouri/MusICA-MetaBench</a>.
+      Preprint: <a href="https://arxiv.org/abs/2607.06015">arXiv:2607.06015</a>.</p>
+    <p>Music: <a href="https://www.audiolabs-erlangen.de/resources/MIR/2025-ChoraleBricks">ChoraleBricks</a>
+      by Stefan Balke, Axel Berndt and Meinard M&uuml;ller
+      (<a href="https://doi.org/10.5334/tismir.252">TISMIR 8(1), 2025</a>). Recordings are redistributed under
+      <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; score images are loaded from the
+      ChoraleBricks website. See <a href="ASSETS-LICENSE.md">ASSETS-LICENSE.md</a>.</p>
+  </footer>
+</main>
+
+<script>
+const REPO_ISSUES = "https://github.com/tomsouri/MusICA-MetaBench/issues/new";
+const EMAIL = "sourada@ufal.mff.cuni.cz";
+const MODALITY = {
+  audio: ["Audio recording", "The models received this recording."],
+  visual: ["Score image", "The models received this score image."],
+  symbolic: ["ABC notation", "The models received this ABC notation as text."],
+};
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...children) => {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+};
+const feedbackLinks = (issueLink, mailLink, title, body) => {
+  const q = (s) => encodeURIComponent(s);
+  issueLink.href = `${REPO_ISSUES}?labels=demo-feedback&title=${q("[demo] " + title)}&body=${q(body)}`;
+  mailLink.href = `mailto:${EMAIL}?subject=${q("[MusICA-MetaBench demo] " + title)}&body=${q(body)}`;
+};
+
+let items = [], pos = 0;
+const chosen = {};   // item index -> letter the visitor picked; kept in memory only
+
+function render() {
+  const item = items[pos];
+  const letter = (option) => option[1];           // "(A) text" -> "A"
+  $("count").textContent = `Item ${pos + 1} of ${items.length}`;
+  const answered = Object.keys(chosen);
+  $("score").textContent = answered.length
+    ? `You: ${answered.filter((i) => chosen[i] === items[i].correct).length} of ${answered.length} correct`
+    : "";
+
+  $("tags").replaceChildren(
+    el("span", { className: `tag ${item.modality}`, textContent: MODALITY[item.modality][0] }),
+    el("span", { className: "tag plain", textContent: item.skill.replace("-", " ") }),
+    el("span", { className: "tag plain", textContent: item.piece_id.replace("_", ": ") }));
+  $("question").textContent = item.question;
+
+  let media;
+  if (item.modality === "audio") {
+    media = el("audio", { controls: true, preload: "metadata", src: item.stimulus });
+  } else if (item.modality === "visual") {
+    media = el("img", { src: item.stimulus, alt: `Score of ${item.piece_id}` });
+    media.onerror = () => media.replaceWith(el("p", {},
+      "The score image could not be loaded from the ChoraleBricks website. See it on the ",
+      el("a", { href: item.piece_page, target: "_blank", rel: "noopener", textContent: "piece's page" }), "."));
+  } else {
+    media = el("pre", { textContent: item.abc });
+  }
+  $("stimulus").replaceChildren(media, el("p", { className: "note", textContent: MODALITY[item.modality][1] }));
+
+  const picked = chosen[pos];
+  $("options").replaceChildren(...item.options.map((option) => {
+    const button = el("button", { textContent: option, disabled: picked !== undefined });
+    if (picked !== undefined && letter(option) === item.correct) button.className = "right";
+    else if (letter(option) === picked) button.className = "wrong";
+    button.onclick = () => { chosen[pos] = letter(option); render(); };
+    return button;
+  }));
+
+  $("reveal").hidden = picked === undefined;
+  if (picked !== undefined) {
+    const right = picked === item.correct;
+    $("verdict").className = "verdict " + (right ? "ok" : "bad");
+    $("verdict").textContent = right ? `Correct: ${item.correct}.`
+      : `Not this time. You chose ${picked}; the ground truth is ${item.correct}.`;
+    $("models-heading").textContent =
+      `${item.answers.filter((a) => a.correct).length} of ${item.answers.length} models answered correctly`;
+    $("models").replaceChildren(...item.answers.map((a) => el("tr", {},
+      el("td", { className: "model", textContent: a.model }),
+      el("td", { className: "ans " + (a.correct ? "ok" : "bad"),
+                 textContent: `${a.correct ? "✓" : "✗"} ${a.answer.length === 1 ? a.answer : "no parsable answer"}` }),
+      el("td", {}, el("details", {},
+        el("summary", { textContent: "Raw response" }),
+        el("pre", { textContent: a.response || "(empty response)" }))))));
+    feedbackLinks($("report-issue"), $("report-mail"), `Item ${pos + 1}: ${item.question}`,
+      `Item id: ${item.item_id}\nPiece: ${item.piece_id}\nModality: ${item.modality}\n` +
+      `Question: ${item.question}\nOptions: ${item.options.join("; ")}\nGround truth: ${item.correct}\n\n` +
+      "What is wrong (which model, if it concerns a model's answer):\n");
+  }
+  $("prev").disabled = pos === 0;
+  $("next").disabled = pos === items.length - 1;
+}
+
+$("prev").onclick = () => { pos--; render(); window.scrollTo(0, 0); };
+$("next").onclick = () => { pos++; render(); window.scrollTo(0, 0); };
+feedbackLinks($("thoughts-issue"), $("thoughts-mail"), "Feedback", "");
+
+fetch("items.json").then((r) => r.json()).then((data) => { items = data; render(); })
+  .catch(() => { $("question").textContent = "Could not load items.json. Serve this folder over HTTP."; });
+</script>
+</body>
+</html>
