@@ -202,6 +202,7 @@ Results, Chorale-bricks, s=300 (20 questions per modality-category pair), one be
   - **Zero Data Retention (ZDR):** Enabled via [OpenRouter ZDR](https://openrouter.ai/docs/guides/features/zdr) where available (note: this was not available for GPT-family audio models). Controlled by `zdr` in the config; before a run, `run_benchmark.py` checks that each model has a ZDR endpoint and stops if not, or turns ZDR off for that model only if `turn_zdr_off_if_no_zdr_endpoint_available` is set.
 - **Inference Configuration:**
   - **Data Encoding:** Symbolic musical files are sent as raw text; audio and image files are sent using Base64 encoding.
+  - **Prompt Caching:** Controlled by `prompt_caching` in the config. Keeping the default question-first order saves close to nothing; `file_first: true` puts the context file before the question to get real cache hits, at the price of a changed prompt.
   - **Parameters:** Models use default parameters to reflect real-world usage, with the exception of the random seed.
   - **Reproducibility:** A pseudo-random seed is generated for each inference call to ensure better reproducibility (successfully achieved for local Qwen-3-omni, though limited for OpenRouter endpoints). We use distributed seeds rather than a single fixed seed to evaluate the model as a distribution rather than a single fixed instance.
 

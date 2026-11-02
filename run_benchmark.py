@@ -141,7 +141,21 @@ def set_logdir(config: dict) -> str:
 # Core LLM Call & Payload Builder
 # =========================================================================
 
-def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, content_file: str, modality: str, submodality: str, no_content_file: bool = False, zdr: bool = True, inference_seed: int = None) -> Tuple[Dict, str]:
+def apply_prompt_caching(content: list, ttl: str = None, file_first: bool = False):
+    """Adds a cache breakpoint to the user message content (question, then any attached file), in place."""
+    cache_control = {"type": "ephemeral"}
+    if ttl:
+        cache_control["ttl"] = ttl
+
+    question, *attachment = content
+    if file_first and attachment:
+        # Docs only describe breakpoints on text blocks, so a fixed one follows the file
+        content[:] = [*attachment, {"type": "text", "text": "End of attached material.", "cache_control": cache_control}, question]
+    else:
+        question["cache_control"] = cache_control
+
+
+def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, content_file: str, modality: str, submodality: str, no_content_file: bool = False, zdr: bool = True, inference_seed: int = None, prompt_caching: dict = None) -> Tuple[Dict, str]:
     """Generates the messages payload based on the modality and files."""
     messages = []
     plugins = None
@@ -210,6 +224,10 @@ def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, conten
                 "role": "user",
                 "content": [{"type": "text", "text": user_prompt_clean}]
             }) 
+
+    prompt_caching = prompt_caching or {}
+    if prompt_caching.get("enabled", True):
+        apply_prompt_caching(messages[-1]["content"], prompt_caching.get("ttl"), prompt_caching.get("file_first", False))
 
     payload = {
         "model": model,
@@ -627,7 +645,8 @@ def main():
                 submodality=submodality,
                 no_content_file=text_only_baseline,
                 zdr=config['zdr'] and model_name not in no_zdr_models,
-                inference_seed=current_seed_for_inference
+                inference_seed=current_seed_for_inference,
+                prompt_caching=config.get('prompt_caching')
             )
 
             # Execute Request
@@ -660,7 +679,7 @@ def main():
                 "model": model_str,
                 "full_json_response": json.dumps(full_json),
                 "extracted_response": resp_text,
-                "config_info": json.dumps({"text-only-baseline": text_only_baseline, "dry_run": config['dry_run'], "url": config['url'], "seed": config['seed'], "white-noise-baseline": white_noise_baseline, "content_file_used": content_file}),                
+                "config_info": json.dumps({"text-only-baseline": text_only_baseline, "dry_run": config['dry_run'], "url": config['url'], "seed": config['seed'], "white-noise-baseline": white_noise_baseline, "content_file_used": content_file, "prompt_caching": config.get('prompt_caching')}),                
                 "label_of_answer": extracted_answer,
                 "price": cost,
                 "time_taken": time_taken,
@@ -684,7 +703,10 @@ def main():
                 config["force_header_print"] = False
 
             # 3. Print concise log
-            print(f"  -> Extracted: {extracted_answer} | Expected: {correct_label} | Correct: {is_correct} | Time: {time_taken:.2f}s | Cost: ${cost:.6f}")
+            prompt_tokens_details = full_json.get('usage', {}).get('prompt_tokens_details') or {}
+            cached_tokens, cache_write_tokens = prompt_tokens_details.get('cached_tokens'), prompt_tokens_details.get('cache_write_tokens')
+            cache_info = f" | Cache read/write tokens: {cached_tokens or 0}/{cache_write_tokens or 0}" if cached_tokens or cache_write_tokens else ""
+            print(f"  -> Extracted: {extracted_answer} | Expected: {correct_label} | Correct: {is_correct} | Time: {time_taken:.2f}s | Cost: ${cost:.6f}{cache_info}")
 
     # =====================================================================
     # Trigger final evaluation logic

@@ -71,6 +71,42 @@ class ApiErrorTests(unittest.TestCase):
         self.assertIn("upstream detail", log)
 
 
+class PromptCachingTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.context_file = os.path.join(tmp.name, "score.png")
+        pathlib.Path(self.context_file).write_bytes(b"png")
+
+    def content(self, prompt_caching, **kwargs):
+        args = {"model": "m", "user_prompt": "Question", "system_prompt": None, "content_file": self.context_file,
+                "modality": "visual", "submodality": "visual.short.png", **kwargs}
+        payload, _ = run_benchmark.prepare_llm_payload(prompt_caching=prompt_caching, **args)
+        return payload["messages"][-1]["content"]
+
+    def test_disabled_sends_no_cache_control(self):
+        content = self.content({"enabled": False, "file_first": True, "ttl": "1h"})
+        self.assertEqual([part["type"] for part in content], ["text", "image_url"])
+        self.assertNotIn("cache_control", json.dumps(content))
+
+    def test_defaults_keep_question_first(self):
+        for prompt_caching in (None, {"enabled": True}):
+            question, image = self.content(prompt_caching)
+            self.assertEqual(question["cache_control"], {"type": "ephemeral"})
+            self.assertEqual(image["type"], "image_url")
+
+    def test_file_first_puts_breakpoint_after_file(self):
+        image, marker, question = self.content({"file_first": True, "ttl": "1h"})
+        self.assertEqual(image["type"], "image_url")
+        self.assertEqual(marker["cache_control"], {"type": "ephemeral", "ttl": "1h"})
+        self.assertEqual((question["text"], "cache_control" in question), ("Question", False))
+
+    def test_no_content_file(self):
+        content = self.content({"file_first": True}, no_content_file=True)
+        self.assertEqual(len(content), 1)
+        self.assertIn("cache_control", content[0])
+
+
 def write_benchmark(path: str, context_file: str, modalities=("symbolic",)):
     """Writes a tiny benchmark TSV with one item per given modality."""
     columns = ["item_id", "question", "labeled_final_options", "all_choices", "index2ans", "label_of_final_correct_option",

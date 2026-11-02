@@ -59,6 +59,14 @@ max_waiting_time_per_request: 300 # in seconds, after which the request will be 
 zdr: true
 turn_zdr_off_if_no_zdr_endpoint_available: false # If true, a model without a ZDR endpoint does not stop the run, ZDR gets turned off for that model only.
 
+# Prompt caching, see https://openrouter.ai/docs/guides/best-practices/prompt-caching
+prompt_caching:
+  enabled: true # If true, a cache_control breakpoint is added to every request. If false, the requests are sent without it.
+  # Caching matches identical prompt prefixes, and every context file is used by several questions, so caching saves
+  # money only with the file before the question. This changes the prompt, so results may not be comparable to runs with
+  # the default order (question first), where close to nothing is cached.
+  file_first: false
+  ttl: null # null for the provider default (5 minutes on Anthropic), "1h" for longer (higher cache write price, Anthropic only).
 
 # Filter benchmark items by any column. Only items with the specified values will be processed.
 # Leave as an empty list (or remove) to process all items.
