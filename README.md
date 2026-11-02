@@ -147,7 +147,7 @@ bash prepare_data_choral_synth.sh
     --benchmark_file test_benchmark.tsv \
     --models "openai/gpt-4o"
 ```
-See the logs from the benchmark evaluation in `logs/run_<datetime><other>/logs.tsv`, and the result table in `results/<model>/<benchmark-size>/<setup>`.
+See the logs from the benchmark evaluation in `logs/run_<datetime><other>/logs.tsv` (full API errors are in `api_errors.log` next to it), and the result table in `results/<model>/<benchmark-size>/<setup>`.
 
 ## Custom datasets, formats and questions
 

@@ -246,7 +246,7 @@ def ask_model(config: dict, payload: dict, original_user_prompt: str, dry_run: b
         return 0.0, time_taken, dummy_json, dummy_json['choices'][0]['message']['content']
 
     max_waiting_time = config.get("max_waiting_time_per_request", 10)
-    response_json = call_api_with_backoff(url, headers, payload, max_waiting_time=max_waiting_time)
+    response_json = call_api_with_backoff(url, headers, payload, max_waiting_time=max_waiting_time, error_log_path=config.get('api_error_log'))
     
     # print(response_json)
 
@@ -259,13 +259,31 @@ def ask_model(config: dict, payload: dict, original_user_prompt: str, dry_run: b
     return cost, time_taken, response_json, response_text
 
 
-def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
+def format_api_error(response: requests.Response) -> str:
+    """Returns the full API error (message, code, metadata), or the raw body if it is not JSON."""
+    try:
+        body = response.json()
+    except ValueError:
+        return response.text
+    return json.dumps(body.get("error", body) if isinstance(body, dict) else body, ensure_ascii=False)
+
+
+def report_api_error(message: str, log_path: str = None):
+    """Prints an API error and appends it to the run's error log."""
+    print(message)
+    if log_path:
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(f"{datetime.datetime.now().isoformat()} {message}\n")
+
+
+def call_api_with_backoff(url, headers, payload, max_waiting_time=300, error_log_path=None):
     """Calls an API with exponential backoff and jitter."""
     start_time = time.time()
     base_delay = 1  
     attempt = 0
 
-    response = {}
+    response = None
+    model = payload.get('model')
 
     errors = []
     
@@ -274,7 +292,11 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
             response = requests.post(url, headers=headers, json=payload, timeout=max_waiting_time)
             # print(json.dumps(response.json(), indent=2))
             response.raise_for_status()
-            return response.json()
+            response_json = response.json()
+            # OpenRouter can report a failure in the body of an HTTP 200 response
+            if "error" in response_json:
+                report_api_error(f"API error for {model} (HTTP {response.status_code}): {format_api_error(response)}", error_log_path)
+            return response_json
             
         except requests.exceptions.RequestException as e:
             # Rather wait for all errors, 429 is "too many requests"
@@ -282,6 +304,12 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
             # if hasattr(e.response, 'status_code') and 400 <= e.response.status_code < 500:
             #     print(f"Fatal error: {e}. Not retrying.")
             #     return {"error": str(e)}
+
+            error = str(e)
+            if e.response is not None:
+                error += f": {format_api_error(e.response)}"
+            errors.append(error)
+            report_api_error(f"Error encountered for {model}: {error}", error_log_path)
             
             delay = min(64, base_delay * (2 ** attempt))
             jitter = random.uniform(0, delay)
@@ -289,16 +317,13 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
             remaining_time = max_waiting_time - (time.time() - start_time)
             if jitter > remaining_time:
                 break
-
-            errors.append(str(e))
                 
-            print(f"Error encountered: {e}. Retrying in {jitter:.2f}s...")
+            print(f"Retrying in {jitter:.2f}s...")
             time.sleep(jitter)
             attempt += 1
-    # TODO: do not return just max waiting time exceeded, but also log the error that caused the final failure
 
-
-    return {"error": "Max waiting time exceeded.", "original_errors": errors, "last_response": str(response)}
+    last_response = format_api_error(response) if response is not None else None
+    return {"error": "Max waiting time exceeded.", "original_errors": errors, "last_response": last_response}
 
 
 def sanitize_payload_for_logging(payload: dict) -> dict:
@@ -399,6 +424,7 @@ def main():
     config['rng'] = rng
 
     logdir = set_logdir(config)
+    config['api_error_log'] = os.path.join(logdir, "api_errors.log")
     
     # ---------------------------------------------------------------------------------
     # Generate Run-Specific Lists / Tabs into Google Sheets
