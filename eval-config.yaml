@@ -73,6 +73,8 @@ cost_estimate:
   enabled: false
   approval_timeout_seconds: 120
   on_timeout: stop # stop | continue: what happens without approval in time. Also applies at once when there is no stdin (e.g. in sbatch).
+  dir: "cost_estimates" # One JSON file per benchmark and model, reused by later runs. null to neither save nor reuse estimates.
+  force_rerun_estimate: false # If true, rerun the samples even if an estimate file exists. Can be overridden by command line argument --force_rerun_estimate
 
 # Filter benchmark items by any column. Only items with the specified values will be processed.
 # Leave as an empty list (or remove) to process all items.

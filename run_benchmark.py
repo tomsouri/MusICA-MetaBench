@@ -92,6 +92,7 @@ import csv
 import datetime
 import json
 import os
+import re
 import sys
 import time
 import uuid
@@ -459,10 +460,20 @@ def check_zdr_endpoints(config: dict, models: list) -> set:
     return missing
 
 
-def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float, bool]:
-    """Runs one item per (model, modality) and extrapolates the cost of the full run. Returns (total, complete).
+def cost_estimate_path(config: dict, model: str) -> str:
+    """Returns the estimate file of a benchmark and model, or None if the estimates are not kept in files."""
+    directory = config.get('cost_estimate', {}).get('dir', 'cost_estimates')
+    if not directory:
+        return None
+    name = f"{os.path.splitext(config['benchmark_file'])[0]}__{model}"
+    return os.path.join(directory, re.sub(r'[^\w.-]+', '_', name) + ".json")
 
-    The sample results are discarded, and the seed sequence of the full run is left untouched.
+
+def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float, bool]:
+    """Extrapolates the cost of the full run from one item per (model, modality). Returns (total, complete).
+
+    Samples saved in the estimate file of the model are reused, only the missing ones are run. The sample results are
+    discarded, and the seed sequence of the full run is left untouched.
     """
     by_modality = {}
     for item in items:
@@ -472,23 +483,59 @@ def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float,
         path = item['path_to_question_context_file']
         return os.path.getsize(path) if os.path.exists(path) else 0
 
+    # A sample reused under other settings can be far off, e.g. a text-only sample for a full run
+    settings = {key: config.get(key) for key in ('prompt_caching', 'text_only_baseline', 'white_noise_baseline')}
+    force_rerun = config.get('cost_estimate', {}).get('force_rerun_estimate', False)
+
     print("\n--- Cost Estimate ---")
     rows = []
     total = 0.0
     complete = True
     for model in config['models']:
+        path = cost_estimate_path(config, model)
+        samples = {}
+        if path and os.path.exists(path) and not force_rerun:
+            with open(path, encoding='utf-8') as f:
+                samples = json.load(f)['samples']
+
+        modality_estimates = {}
         for modality, group in by_modality.items():
-            # Median context size, as the size of the context file drives the prompt cost
-            sample = sorted(group, key=context_size)[len(group) // 2]
-            print(f"\nSample for model {model} | Modality: {modality} | Item ID: {sample.get('item_id')}")
-            payload, final_prompt, _ = build_item_request(config, model, sample, config.get('seed'), no_zdr_models)
-            cost, _, full_json, _ = ask_model(config, payload, final_prompt, config['dry_run'])
-            if full_json.get('usage', {}).get('cost') is None:
-                complete = False
-                rows.append((model, modality, len(group), "no cost reported", "-"))
+            saved = samples.get(modality)
+            if saved:
+                print(f"\nReusing saved sample from {saved['date']} for model {model} | Modality: {modality} | {path}")
+                if saved['settings'] != settings:
+                    print(f"Warning: the saved sample used other settings: {saved['settings']}, now: {settings}. "
+                          "Use --force_rerun_estimate to replace it.")
+                cost = saved['cost']
             else:
-                total += cost * len(group)
-                rows.append((model, modality, len(group), f"${cost:.6f}", f"${cost * len(group):.4f}"))
+                # Median context size, as the size of the context file drives the prompt cost
+                sample = sorted(group, key=context_size)[len(group) // 2]
+                print(f"\nSample for model {model} | Modality: {modality} | Item ID: {sample.get('item_id')}")
+                payload, final_prompt, _ = build_item_request(config, model, sample, config.get('seed'), no_zdr_models)
+                cost, _, full_json, _ = ask_model(config, payload, final_prompt, config['dry_run'])
+                if full_json.get('usage', {}).get('cost') is None:
+                    rows.append((model, modality, len(group), "no cost reported", "-"))
+                    continue
+                samples[modality] = {"item_id": sample.get('item_id'), "context_file": sample['path_to_question_context_file'],
+                                     "cost": cost, "usage": full_json['usage'], "settings": settings,
+                                     "date": datetime.datetime.now().isoformat(timespec='seconds')}
+
+            total += cost * len(group)
+            rows.append((model, modality, len(group), f"${cost:.6f}", f"${cost * len(group):.4f}"))
+            modality_estimates[modality] = {"items": len(group), "sample_cost": cost, "estimated_cost": cost * len(group)}
+
+        model_complete = len(modality_estimates) == len(by_modality)
+        complete = complete and model_complete
+        if path:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump({"benchmark_file": config['benchmark_file'], "model": model, "samples": samples, "estimate": {
+                    "modalities": modality_estimates,
+                    "items": sum(row["items"] for row in modality_estimates.values()),
+                    "cost": sum(row["estimated_cost"] for row in modality_estimates.values()),
+                    "complete": model_complete,
+                }}, f, indent=2)
+            print(f"Saved the cost estimate to {path}")
 
     print(f"\n{'Model':<45} {'Modality':<10} {'Items':>6} {'Sample cost':>17} {'Estimate':>12}")
     for model, modality, count, sample_cost, estimate in rows:
@@ -562,6 +609,9 @@ def main():
     parser.add_argument("--cost_estimate", default=False, action="store_true",
                         help="Before the full run, run one item per modality and model, print the estimated cost and wait for approval (overrides config).")
 
+    parser.add_argument("--force_rerun_estimate", default=False, action="store_true",
+                        help="With the cost estimate on, rerun the samples even if an estimate file exists (overrides config).")
+
     parser.add_argument("--disable_zdr", default=False, action="store_true",
                         help="Disable ZDR in the payload, to allow running other audio models that do not support ZDR (overrides config).")
 
@@ -602,6 +652,8 @@ def main():
 
     if cmdline_args.cost_estimate:
         config.setdefault('cost_estimate', {})['enabled'] = True
+    if cmdline_args.force_rerun_estimate:
+        config.setdefault('cost_estimate', {})['force_rerun_estimate'] = True
 
     if cmdline_args.run_id:
         benchmark_run_uuid = cmdline_args.run_id

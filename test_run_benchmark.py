@@ -134,6 +134,7 @@ class MainTestCase(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.tmp = tmp.name
+        self.estimates_dir = os.path.join(self.tmp, "estimates")
         self.context_file = os.path.join(self.tmp, "piece.abc.txt")
         pathlib.Path(self.context_file).write_text("X:1\nK:C\nCDEF|")
 
@@ -144,7 +145,9 @@ class MainTestCase(unittest.TestCase):
         benchmark_file = os.path.join(self.tmp, "benchmark.tsv")
         write_benchmark(benchmark_file, self.context_file, modalities)
         config.update({"models": ["m"], "benchmark_file": benchmark_file, "logdir": self.tmp, "evaluation_criteria": [],
-                       "evaluation_output_file": None, "log_to_google_sheet": False, **(overrides or {})})
+                       "evaluation_output_file": None, "log_to_google_sheet": False, "seed": 42,
+                       "turn_zdr_off_if_no_zdr_endpoint_available": False,
+                       "cost_estimate": {"enabled": False, "dir": self.estimates_dir}, **(overrides or {})})
         config_path = os.path.join(self.tmp, "config.yaml")
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
@@ -226,10 +229,12 @@ class WaitForApprovalTests(unittest.TestCase):
 
 
 class CostEstimateTests(MainTestCase):
-    def estimate(self, items, post_response=None):
+    def estimate(self, items, post_response=None, settings=None, **cost_estimate):
         with open("eval-config.yaml", encoding="utf-8") as f:
             config = yaml.safe_load(f)
-        config.update({"models": ["m1", "m2"], "dry_run": False, "zdr": True, "api_error_log": None})
+        config.update({"models": ["m1", "m2"], "dry_run": False, "zdr": True, "api_error_log": None,
+                       "benchmark_file": "benchmarks/set/seed_1.tsv",
+                       "cost_estimate": {"dir": self.estimates_dir, **cost_estimate}, **(settings or {})})
         post = mock.Mock(side_effect=lambda *a, **k: post_response(k["json"]) if post_response else fake_response(200, self.api_response))
         with mock.patch.object(run_benchmark.requests, "post", post):
             return run_benchmark.estimate_cost(config, items, set()), post
@@ -259,6 +264,62 @@ class CostEstimateTests(MainTestCase):
         self.assertAlmostEqual(total, 0.01)
         self.assertFalse(complete)
 
+    def saved_estimate(self, model="m1"):
+        name = f"benchmarks_set_seed_1__{model}.json"
+        return json.loads(pathlib.Path(self.estimates_dir, name).read_text())
+
+    def test_saves_sample_costs_and_estimate_per_benchmark_and_model(self):
+        self.estimate([make_item(str(i), "symbolic", self.context_file) for i in range(3)])
+        saved = self.saved_estimate()
+        self.assertEqual((saved["model"], saved["benchmark_file"]), ("m1", "benchmarks/set/seed_1.tsv"))
+        self.assertAlmostEqual(saved["samples"]["symbolic"]["cost"], 0.01)
+        self.assertAlmostEqual(saved["estimate"]["cost"], 0.03)
+        self.assertEqual((saved["estimate"]["items"], saved["estimate"]["complete"]), (3, True))
+
+    def test_existing_estimate_is_reused_for_the_current_size(self):
+        self.estimate([make_item("1", "symbolic", self.context_file)])
+        (total, complete), post = self.estimate([make_item(str(i), "symbolic", self.context_file) for i in range(5)])
+        post.assert_not_called()
+        self.assertAlmostEqual(total, 2 * 5 * 0.01)
+        self.assertTrue(complete)
+        self.assertEqual(self.saved_estimate()["estimate"]["items"], 5)
+
+    def test_force_rerun_replaces_the_estimate(self):
+        items = [make_item("1", "symbolic", self.context_file)]
+        self.estimate(items)
+        first_date = self.saved_estimate()["samples"]["symbolic"]["date"]
+        _, post = self.estimate(items, force_rerun_estimate=True)
+        self.assertEqual(post.call_count, 2)
+        self.assertGreaterEqual(self.saved_estimate()["samples"]["symbolic"]["date"], first_date)
+
+    def test_only_missing_modalities_are_sampled_and_kept_with_the_saved_ones(self):
+        self.estimate([make_item("1", "symbolic", self.context_file)])
+        (total, _), post = self.estimate([make_item("1", "symbolic", self.context_file), make_item("2", "visual", self.context_file)])
+        self.assertEqual(post.call_count, 2)
+        self.assertEqual(sorted(self.saved_estimate()["samples"]), ["symbolic", "visual"])
+        self.assertAlmostEqual(total, 2 * 2 * 0.01)
+
+    def test_failed_sample_is_not_reused(self):
+        def respond(payload):
+            return fake_response(200, {"error": {"message": "failed"}})
+        items = [make_item("1", "symbolic", self.context_file)]
+        self.estimate(items, respond)
+        self.assertEqual(self.saved_estimate()["samples"], {})
+        self.assertFalse(self.saved_estimate()["estimate"]["complete"])
+        _, post = self.estimate(items)
+        self.assertEqual(post.call_count, 2)
+
+    def test_reuse_warns_about_other_settings(self):
+        items = [make_item("1", "symbolic", self.context_file)]
+        self.estimate(items)
+        with mock.patch("builtins.print") as printed:
+            self.estimate(items, settings={"text_only_baseline": True})
+        self.assertIn("other settings", " ".join(str(call.args[0]) for call in printed.call_args_list if call.args))
+
+    def test_no_dir_keeps_no_file(self):
+        self.estimate([make_item("1", "symbolic", self.context_file)], dir=None)
+        self.assertFalse(os.path.exists(self.estimates_dir))
+
     def test_approved_run_matches_a_run_without_estimate(self):
         def seeds(post):
             return [call.kwargs["json"]["seed"] for call in post.call_args_list]
@@ -271,7 +332,7 @@ class CostEstimateTests(MainTestCase):
 
     def test_refused_run_sends_only_the_samples(self):
         with mock.patch.object(run_benchmark, "wait_for_approval", side_effect=SystemExit("stop")), self.assertRaises(SystemExit):
-            self.run_main({"cost_estimate": {"enabled": True}}, modalities=("symbolic", "visual"))
+            self.run_main({"cost_estimate": {"enabled": True, "dir": self.estimates_dir}}, modalities=("symbolic", "visual"))
         self.assertEqual(self.post.call_count, 2)
 
     def test_off_by_default_and_skipped_on_dry_run(self):
