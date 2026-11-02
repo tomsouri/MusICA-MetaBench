@@ -30,7 +30,10 @@ def shorten_model_name(name):
         'aggregate-gpt-5-full': 'GPT-5 Full',
         'deepseek_deepseek-v3.2': 'DeepSeek V3.2',
         'google_gemma-3-27b-it': 'Gemma 3 27B',
-        'meta-llama_llama-4-scout': 'Llama 4 Scout'
+        'meta-llama_llama-4-scout': 'Llama 4 Scout',
+        'google_gemini-4-argon': 'Gemini 4 Argon',
+        'openai_gpt-6-astra': 'GPT-6 Astra',
+        'anthropic_claude-opus-5.5': 'Claude Opus 5.5'
     }
     if name in mapping:
         return mapping[name]

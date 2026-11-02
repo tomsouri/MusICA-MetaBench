@@ -31,7 +31,7 @@ def aggregate_results(base_path, b_size, seed, fields, setup, output, compare_mo
     
     # Prepare list to hold data
     final_cols = []
-    base_df = None
+    loaded_cols = []
 
     for model in all_models:
         setups = ["normal", "text-only", "white-noise"] if compare_mode else [setup]
@@ -73,13 +73,6 @@ def aggregate_results(base_path, b_size, seed, fields, setup, output, compare_mo
                 continue
             
             df = pd.read_csv(file_path, sep='\t')
-            
-            # Validation
-            if base_df is None:
-                base_df = df[merge_keys].copy()
-            else:
-                if not base_df.equals(df[merge_keys]):
-                    raise ValueError(f"Consistency error: {file_path} does not match base keys.")
 
             # Add requested fields for this model/setup
             for field in fields:
@@ -93,7 +86,25 @@ def aggregate_results(base_path, b_size, seed, fields, setup, output, compare_mo
                 field_str = f"_{field_str}" if len(fields) > 1 else ""
                 col_name = f"{model}{setup_str}{field_str}"
 
-                final_cols.append(df[field].rename(col_name))
+                loaded_cols.append((file_path, df, field, col_name))
+
+    # A run limited to some modalities has fewer rows, so the largest run defines the table
+    reference = max((df for _, df, _, _ in loaded_cols), key=len)
+    base_df = reference[merge_keys].copy()
+    align_keys = ['Criterion_Type', 'Criterion_Value']
+    base_index = pd.MultiIndex.from_frame(reference[align_keys])
+
+    for file_path, df, field, col_name in loaded_cols:
+        # Validation
+        if len(df) == len(reference):
+            if not base_df.equals(df[merge_keys]):
+                raise ValueError(f"Consistency error: {file_path} does not match base keys.")
+        else:
+            if not pd.MultiIndex.from_frame(df[align_keys]).isin(base_index).all():
+                raise ValueError(f"Consistency error: {file_path} has criteria missing from the base keys.")
+            print(f"Warning: {file_path} is a partial run ({len(df)} of {len(reference)} rows), missing rows stay empty.")
+
+        final_cols.append(df.set_index(align_keys)[field].reindex(base_index).reset_index(drop=True).rename(col_name))
 
     # Construct Final DataFrame
     result_df = pd.concat([base_df] + final_cols, axis=1)

@@ -79,11 +79,14 @@ def shorten_name(name):
         'aggregate-gpt-4o': 'GPT-4o',
         'aggregate-gpt-5': 'GPT-5',
         'aggregate-mistral': 'Mistral',
-        'aggregate-gpt-5-full': 'GPT-5 Full'
+        'aggregate-gpt-5-full': 'GPT-5 Full',
+        'google_gemini-4-argon': 'Gemini 4 Argon',
+        'openai_gpt-6-astra': 'GPT-6 Astra',
+        'anthropic_claude-opus-5.5': 'Claude Opus 5.5'
     }
     if name in mapping:
         return mapping[name]
-    
+
     # Generic shortening
     name = name.replace('google_', '').replace('aggregate-', '')
     if len(name) > 15:
