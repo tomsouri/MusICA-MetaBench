@@ -174,7 +174,7 @@ def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, conten
     else:
         if modality == "visual" and submodality.endswith(".png"):
             base64_image = encode_file_to_base64(content_file)
-            data_url = f"data:image/jpeg;base64,{base64_image}"
+            data_url = f"data:image/png;base64,{base64_image}"
             messages.append({
                 "role": "user",
                 "content": [

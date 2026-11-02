@@ -89,6 +89,7 @@ class PromptCachingTests(unittest.TestCase):
     def test_disabled_sends_no_cache_control(self):
         content = self.content({"enabled": False, "file_first": True, "ttl": "1h"})
         self.assertEqual([part["type"] for part in content], ["text", "image_url"])
+        self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
         self.assertNotIn("cache_control", json.dumps(content))
 
     def test_defaults_keep_question_first(self):
