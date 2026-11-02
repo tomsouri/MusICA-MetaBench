@@ -470,7 +470,7 @@ def cost_estimate_path(config: dict, model: str) -> str:
 
 
 def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float, bool]:
-    """Extrapolates the cost of the full run from one item per (model, modality). Returns (total, complete).
+    """Extrapolates the cost and time of the full run from one item per (model, modality). Returns (total cost, complete).
 
     Samples saved in the estimate file of the model are reused, only the missing ones are run. The sample results are
     discarded, and the seed sequence of the full run is left untouched.
@@ -490,7 +490,13 @@ def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float,
     print("\n--- Cost Estimate ---")
     rows = []
     total = 0.0
+    total_time = 0.0
     complete = True
+    time_complete = True
+
+    def duration(seconds):
+        return str(datetime.timedelta(seconds=round(seconds)))
+
     for model in config['models']:
         path = cost_estimate_path(config, model)
         samples = {}
@@ -507,22 +513,30 @@ def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float,
                     print(f"Warning: the saved sample used other settings: {saved['settings']}, now: {settings}. "
                           "Use --force_rerun_estimate to replace it.")
                 cost = saved['cost']
+                time_taken = saved.get('time_taken') # Missing in the files saved before time was estimated
             else:
                 # Median context size, as the size of the context file drives the prompt cost
                 sample = sorted(group, key=context_size)[len(group) // 2]
                 print(f"\nSample for model {model} | Modality: {modality} | Item ID: {sample.get('item_id')}")
                 payload, final_prompt, _ = build_item_request(config, model, sample, config.get('seed'), no_zdr_models)
-                cost, _, full_json, _ = ask_model(config, payload, final_prompt, config['dry_run'])
+                cost, time_taken, full_json, _ = ask_model(config, payload, final_prompt, config['dry_run'])
                 if full_json.get('usage', {}).get('cost') is None:
-                    rows.append((model, modality, len(group), "no cost reported", "-"))
+                    rows.append((model, modality, len(group), "no cost reported", "-", "-", "-"))
                     continue
                 samples[modality] = {"item_id": sample.get('item_id'), "context_file": sample['path_to_question_context_file'],
-                                     "cost": cost, "usage": full_json['usage'], "settings": settings,
+                                     "cost": cost, "time_taken": time_taken, "usage": full_json['usage'], "settings": settings,
                                      "date": datetime.datetime.now().isoformat(timespec='seconds')}
 
             total += cost * len(group)
-            rows.append((model, modality, len(group), f"${cost:.6f}", f"${cost * len(group):.4f}"))
             modality_estimates[modality] = {"items": len(group), "sample_cost": cost, "estimated_cost": cost * len(group)}
+            if time_taken is None:
+                time_complete = False
+                time_columns = ("-", "-")
+            else:
+                total_time += time_taken * len(group)
+                time_columns = (f"{time_taken:.1f}s", duration(time_taken * len(group)))
+                modality_estimates[modality].update({"sample_time_seconds": time_taken, "estimated_time_seconds": time_taken * len(group)})
+            rows.append((model, modality, len(group), f"${cost:.6f}", f"${cost * len(group):.4f}", *time_columns))
 
         model_complete = len(modality_estimates) == len(by_modality)
         complete = complete and model_complete
@@ -533,15 +547,19 @@ def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float,
                     "modalities": modality_estimates,
                     "items": sum(row["items"] for row in modality_estimates.values()),
                     "cost": sum(row["estimated_cost"] for row in modality_estimates.values()),
+                    "time_seconds": sum(row.get("estimated_time_seconds", 0) for row in modality_estimates.values()),
                     "complete": model_complete,
                 }}, f, indent=2)
             print(f"Saved the cost estimate to {path}")
 
-    print(f"\n{'Model':<45} {'Modality':<10} {'Items':>6} {'Sample cost':>17} {'Estimate':>12}")
-    for model, modality, count, sample_cost, estimate in rows:
-        print(f"{model:<45} {modality:<10} {count:>6} {sample_cost:>17} {estimate:>12}")
+    print(f"\n{'Model':<45} {'Modality':<10} {'Items':>6} {'Sample cost':>17} {'Estimate':>12} {'Sample time':>12} {'Time':>10}")
+    for model, modality, count, sample_cost, estimate, sample_time, time_estimate in rows:
+        print(f"{model:<45} {modality:<10} {count:>6} {sample_cost:>17} {estimate:>12} {sample_time:>12} {time_estimate:>10}")
     print(f"\nEstimated total cost: ${total:.4f}" + ("" if complete else " (lower bound, some samples reported no cost)"))
-    print("Response lengths vary, and samples are not representative of cache hits in the full run.")
+    print(f"Estimated total time: {duration(total_time)}" + ("" if complete and time_complete else
+          " (lower bound, some samples have no time, use --force_rerun_estimate to measure them)"))
+    print("Response lengths vary, and samples are not representative of cache hits in the full run. "
+          "Times are from single requests, so they include any retries of the sample and vary with provider load.")
     return total, complete
 
 

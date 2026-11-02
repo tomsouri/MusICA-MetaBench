@@ -316,6 +316,35 @@ class CostEstimateTests(MainTestCase):
             self.estimate(items, settings={"text_only_baseline": True})
         self.assertIn("other settings", " ".join(str(call.args[0]) for call in printed.call_args_list if call.args))
 
+    def test_time_scales_by_item_count_and_is_reused(self):
+        items = [make_item(str(i), "symbolic", self.context_file) for i in range(3)]
+        response = (0.01, 2.0, self.api_response, "Answer: A")
+        with mock.patch.object(run_benchmark, "ask_model", return_value=response), mock.patch("builtins.print") as printed:
+            self.estimate(items)
+        self.assertIn("Estimated total time: 0:00:12", [call.args[0] for call in printed.call_args_list if call.args])
+        self.assertAlmostEqual(self.saved_estimate()["estimate"]["time_seconds"], 6.0)
+        with mock.patch("builtins.print") as printed:
+            _, post = self.estimate(items + items)
+        post.assert_not_called()
+        self.assertAlmostEqual(self.saved_estimate()["estimate"]["time_seconds"], 12.0)
+        self.assertIn("Estimated total time: 0:00:24", [call.args[0] for call in printed.call_args_list if call.args])
+
+    def test_saved_sample_without_time_gives_lower_bound(self):
+        items = [make_item("1", "symbolic", self.context_file)]
+        self.estimate(items)
+        for model in ("m1", "m2"):
+            saved_path = pathlib.Path(self.estimates_dir, f"benchmarks_set_seed_1__{model}.json")
+            saved = json.loads(saved_path.read_text())
+            del saved["samples"]["symbolic"]["time_taken"]
+            saved_path.write_text(json.dumps(saved))
+        with mock.patch("builtins.print") as printed:
+            (total, complete), post = self.estimate(items)
+        post.assert_not_called()
+        self.assertAlmostEqual(total, 0.02)
+        self.assertTrue(complete)
+        self.assertTrue(any("total time" in call.args[0] and "lower bound" in call.args[0]
+                            for call in printed.call_args_list if call.args))
+
     def test_no_dir_keeps_no_file(self):
         self.estimate([make_item("1", "symbolic", self.context_file)], dir=None)
         self.assertFalse(os.path.exists(self.estimates_dir))
