@@ -199,7 +199,7 @@ Results, Chorale-bricks, s=300 (20 questions per modality-category pair), one be
   - **Local Deployment:** Qwen-3-omni (specifically `Qwen3-Omni-30B-A3B-Thinking`, full precision) is run locally using [vLLM](https://docs.vllm.ai/) on an NVIDIA GH200 superchip (144GB GPU VRAM).
 - **Data Privacy & Leakage Prevention:**
   - **Leakage Prevention:** Use of endpoints that may train on inputs is disabled.
-  - **Zero Data Retention (ZDR):** Enabled via [OpenRouter ZDR](https://openrouter.ai/docs/guides/features/zdr) where available (note: this was not available for GPT-family audio models).
+  - **Zero Data Retention (ZDR):** Enabled via [OpenRouter ZDR](https://openrouter.ai/docs/guides/features/zdr) where available (note: this was not available for GPT-family audio models). Controlled by `zdr` in the config; before a run, `run_benchmark.py` checks that each model has a ZDR endpoint and stops if not, or turns ZDR off for that model only if `turn_zdr_off_if_no_zdr_endpoint_available` is set.
 - **Inference Configuration:**
   - **Data Encoding:** Symbolic musical files are sent as raw text; audio and image files are sent using Base64 encoding.
   - **Parameters:** Models use default parameters to reflect real-world usage, with the exception of the random seed.

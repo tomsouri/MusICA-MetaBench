@@ -54,6 +54,11 @@ env_api_key_name: "OPENROUTER_API_KEY"
 
 max_waiting_time_per_request: 300 # in seconds, after which the request will be considered failed and logged as such
 
+# Zero Data Retention: route requests only to ZDR endpoints. Can be overridden by command line argument --disable_zdr
+# Before running, every model is checked for an available ZDR endpoint, and the run stops with an error if a model has none.
+zdr: true
+turn_zdr_off_if_no_zdr_endpoint_available: false # If true, a model without a ZDR endpoint does not stop the run, ZDR gets turned off for that model only.
+
 
 # Filter benchmark items by any column. Only items with the specified values will be processed.
 # Leave as an empty list (or remove) to process all items.

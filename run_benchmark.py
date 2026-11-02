@@ -326,6 +326,53 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300, error_log
     return {"error": "Max waiting time exceeded.", "original_errors": errors, "last_response": last_response}
 
 
+def resolve_concrete_models(config: dict, items: list) -> list:
+    """Returns the models actually sent to the API, expanding aggregates over the modalities present in items."""
+    aggregates = config.get("supported_aggregate_models", {})
+    modalities = {item.get('modality') for item in items}
+    concrete = set()
+    for model in config['models']:
+        if model in aggregates:
+            concrete.update(aggregates[model][modality] for modality in modalities)
+        else:
+            concrete.add(model)
+    return sorted(concrete)
+
+
+def check_zdr_endpoints(config: dict, models: list) -> set:
+    """Verifies that every model has a ZDR endpoint. Returns the models for which ZDR gets switched off."""
+    url = config['url']
+    if not config.get('zdr', True):
+        return set()
+    if config.get('dry_run'):
+        print("Dry run: skipping the check of ZDR endpoint availability.")
+        return set()
+    if "openrouter.ai" not in url:
+        print(f"Skipping the check of ZDR endpoint availability, as {url} is not an OpenRouter URL.")
+        return set()
+
+    zdr_url = url.replace("/chat/completions", "/endpoints/zdr")
+    headers = {"Authorization": f"Bearer {os.environ.get(config['env_api_key_name'], '')}"}
+    try:
+        response = requests.get(zdr_url, headers=headers, timeout=60)
+        response.raise_for_status()
+        available = {endpoint.get('model_id') for endpoint in response.json()['data']}
+    except (requests.exceptions.RequestException, KeyError) as e:
+        detail = format_api_error(e.response) if getattr(e, 'response', None) is not None else repr(e)
+        raise ValueError(f"Could not get the list of ZDR endpoints from {zdr_url}, so ZDR availability cannot be verified: {detail}") from e
+
+    missing = {model for model in models if model not in available}
+    if missing and config.get('turn_zdr_off_if_no_zdr_endpoint_available', False):
+        print(f"Warning: no ZDR endpoint available for {sorted(missing)}. Running these models with ZDR turned off.")
+    elif missing:
+        raise ValueError(
+            f"No ZDR endpoint available for {sorted(missing)}. To run with ZDR turned off, use --disable_zdr or set "
+            "'zdr: false' in the config, or set 'turn_zdr_off_if_no_zdr_endpoint_available: true' in the config to "
+            "turn it off only for the models without a ZDR endpoint."
+        )
+    return missing
+
+
 def sanitize_payload_for_logging(payload: dict) -> dict:
     """Removes base64 data streams from logs."""
     sanitized = json.loads(json.dumps(payload))
@@ -373,7 +420,7 @@ def main():
                         help="Dry run: do not send anything to LLMs")
     
     parser.add_argument("--disable_zdr", default=False, action="store_true",
-                        help="Disable ZDR in the payload, to allow running other audio models that do not support ZDR.")
+                        help="Disable ZDR in the payload, to allow running other audio models that do not support ZDR (overrides config).")
 
 
     cmdline_args = parser.parse_args()
@@ -408,10 +455,7 @@ def main():
     if cmdline_args.max_waiting_time_per_request:
         config['max_waiting_time_per_request'] = cmdline_args.max_waiting_time_per_request
 
-    if cmdline_args.disable_zdr:
-        config['zdr'] = False
-    else:
-        config['zdr'] = True
+    config['zdr'] = config.get('zdr', True) and not cmdline_args.disable_zdr
 
     if cmdline_args.run_id:
         benchmark_run_uuid = cmdline_args.run_id
@@ -497,6 +541,8 @@ def main():
     total_runs = len(items) * len(config['models'])
     print(f"Total question/model loops to perform: {total_runs}\n")
 
+    no_zdr_models = check_zdr_endpoints(config, resolve_concrete_models(config, items))
+
     # Prepare the log TSV headers
     log_headers = headers + [
         "benchmark_run_uuid", "datetime", "full_prompt", "parameters" , "model", "full_json_response",
@@ -580,7 +626,7 @@ def main():
                 modality=modality, 
                 submodality=submodality,
                 no_content_file=text_only_baseline,
-                zdr=config.get('zdr', True),
+                zdr=config['zdr'] and model_name not in no_zdr_models,
                 inference_seed=current_seed_for_inference
             )
 

@@ -15,11 +15,13 @@ To run:
 import json
 import os
 import pathlib
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
 import requests
+import yaml
 
 import run_benchmark
 
@@ -67,6 +69,88 @@ class ApiErrorTests(unittest.TestCase):
         result, log = self.call(fake_response(200, self.error))
         self.assertEqual(result, self.error)
         self.assertIn("upstream detail", log)
+
+
+def write_benchmark(path: str, context_file: str, modalities=("symbolic",)):
+    """Writes a tiny benchmark TSV with one item per given modality."""
+    columns = ["item_id", "question", "labeled_final_options", "all_choices", "index2ans", "label_of_final_correct_option",
+               "path_to_question_context_file", "modality", "submodality"]
+    options = json.dumps(["(A) G4", "(B) F4"])
+    with open(path, "w", encoding="utf-8") as f:
+        print("\t".join(columns), file=f)
+        for i, modality in enumerate(modalities):
+            row = [f"item{i}", "Which note?", options, json.dumps(["A", "B"]), json.dumps({"A": "G4", "B": "F4"}), "A",
+                   context_file, modality, f"{modality}.abc.txt"]
+            print("\t".join(row), file=f)
+
+
+class MainTestCase(unittest.TestCase):
+    """Runs main() end to end on a tiny benchmark, with mocked HTTP."""
+    api_response = {"choices": [{"message": {"content": "Answer: A"}}], "usage": {"cost": 0.01}}
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = tmp.name
+        self.context_file = os.path.join(self.tmp, "piece.abc.txt")
+        pathlib.Path(self.context_file).write_text("X:1\nK:C\nCDEF|")
+
+    def run_main(self, overrides=None, argv=(), modalities=("symbolic",), zdr_models=("m",), zdr_status=200):
+        """Runs main() and returns the mocked requests.post, so that sent payloads can be inspected."""
+        with open("eval-config.yaml", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        benchmark_file = os.path.join(self.tmp, "benchmark.tsv")
+        write_benchmark(benchmark_file, self.context_file, modalities)
+        config.update({"models": ["m"], "benchmark_file": benchmark_file, "logdir": self.tmp, "evaluation_criteria": [],
+                       "evaluation_output_file": None, "log_to_google_sheet": False, **(overrides or {})})
+        config_path = os.path.join(self.tmp, "config.yaml")
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.dump(config, f)
+
+        zdr_list = fake_response(zdr_status, {"data": [{"model_id": model} for model in zdr_models]})
+        self.post = post = mock.Mock(side_effect=lambda *a, **k: fake_response(200, self.api_response))
+        with mock.patch.object(sys, "argv", ["run_benchmark.py", "--config", config_path, *argv]), \
+                mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}), \
+                mock.patch.object(run_benchmark.requests, "get", return_value=zdr_list) as self.get, \
+                mock.patch.object(run_benchmark.requests, "post", post):
+            run_benchmark.main()
+        return post
+
+    @staticmethod
+    def sent_zdr(post):
+        """Returns {model: zdr flag} of the sent requests."""
+        return {call.kwargs["json"]["model"]: call.kwargs["json"]["provider"]["zdr"] for call in post.call_args_list}
+
+
+class ZdrTests(MainTestCase):
+    aggregate = {"models": ["agg"], "supported_aggregate_models": {"agg": {"audio": "a", "symbolic": "s", "visual": "v"}}}
+
+    def test_available_keeps_zdr(self):
+        self.assertEqual(self.sent_zdr(self.run_main()), {"m": True})
+
+    def test_missing_stops_before_any_model_call(self):
+        with self.assertRaisesRegex(ValueError, "No ZDR endpoint available for \\['m'\\].*--disable_zdr"):
+            self.run_main(zdr_models=())
+        self.post.assert_not_called()
+
+    def test_missing_with_turn_off_switches_only_that_model(self):
+        post = self.run_main({"turn_zdr_off_if_no_zdr_endpoint_available": True, **self.aggregate},
+                             modalities=("symbolic", "visual"), zdr_models=("v",))
+        self.assertEqual(self.sent_zdr(post), {"s": False, "v": True})
+
+    def test_aggregate_ignores_filtered_out_modalities(self):
+        post = self.run_main(self.aggregate, zdr_models=("s",))
+        self.assertEqual(self.sent_zdr(post), {"s": True})
+
+    def test_list_fetch_failure_stops(self):
+        with self.assertRaisesRegex(ValueError, "cannot be verified"):
+            self.run_main(zdr_status=500)
+
+    def test_disabled_in_config_or_cmdline_skips_check(self):
+        for overrides, argv in (({"zdr": False}, ()), ({}, ("--disable_zdr",))):
+            post = self.run_main(overrides, argv, zdr_models=())
+            self.assertEqual(self.sent_zdr(post), {"m": False})
+            self.get.assert_not_called()
 
 
 if __name__ == "__main__":
