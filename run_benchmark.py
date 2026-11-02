@@ -96,6 +96,7 @@ import sys
 import time
 import uuid
 import random
+import select
 import shutil
 from typing import Dict, Tuple
 import numpy as np
@@ -458,6 +459,60 @@ def check_zdr_endpoints(config: dict, models: list) -> set:
     return missing
 
 
+def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float, bool]:
+    """Runs one item per (model, modality) and extrapolates the cost of the full run. Returns (total, complete).
+
+    The sample results are discarded, and the seed sequence of the full run is left untouched.
+    """
+    by_modality = {}
+    for item in items:
+        by_modality.setdefault(item.get('modality'), []).append(item)
+
+    def context_size(item):
+        path = item['path_to_question_context_file']
+        return os.path.getsize(path) if os.path.exists(path) else 0
+
+    print("\n--- Cost Estimate ---")
+    rows = []
+    total = 0.0
+    complete = True
+    for model in config['models']:
+        for modality, group in by_modality.items():
+            # Median context size, as the size of the context file drives the prompt cost
+            sample = sorted(group, key=context_size)[len(group) // 2]
+            print(f"\nSample for model {model} | Modality: {modality} | Item ID: {sample.get('item_id')}")
+            payload, final_prompt, _ = build_item_request(config, model, sample, config.get('seed'), no_zdr_models)
+            cost, _, full_json, _ = ask_model(config, payload, final_prompt, config['dry_run'])
+            if full_json.get('usage', {}).get('cost') is None:
+                complete = False
+                rows.append((model, modality, len(group), "no cost reported", "-"))
+            else:
+                total += cost * len(group)
+                rows.append((model, modality, len(group), f"${cost:.6f}", f"${cost * len(group):.4f}"))
+
+    print(f"\n{'Model':<45} {'Modality':<10} {'Items':>6} {'Sample cost':>17} {'Estimate':>12}")
+    for model, modality, count, sample_cost, estimate in rows:
+        print(f"{model:<45} {modality:<10} {count:>6} {sample_cost:>17} {estimate:>12}")
+    print(f"\nEstimated total cost: ${total:.4f}" + ("" if complete else " (lower bound, some samples reported no cost)"))
+    print("Response lengths vary, and samples are not representative of cache hits in the full run.")
+    return total, complete
+
+
+def wait_for_approval(timeout: float, on_timeout: str):
+    """Waits for Enter. On timeout, or at once if stdin is closed (e.g. in sbatch), stops or continues as configured."""
+    deadline = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
+    print(f"Press Enter to start the full run, Ctrl+C to abort. With no approval by {deadline:%H:%M:%S} ({timeout}s), "
+          f"the on_timeout action applies: {on_timeout}.", flush=True)
+
+    ready, _, _ = select.select([sys.stdin], [], [], timeout)
+    if ready and sys.stdin.readline():
+        return
+    if on_timeout == "continue":
+        print("No approval received, continuing as configured.")
+        return
+    sys.exit("No approval received, stopping the run. No full run was started.")
+
+
 def sanitize_payload_for_logging(payload: dict) -> dict:
     """Removes base64 data streams from logs."""
     sanitized = json.loads(json.dumps(payload))
@@ -504,6 +559,9 @@ def main():
     parser.add_argument("--dry_run", default=False, action="store_true", 
                         help="Dry run: do not send anything to LLMs")
     
+    parser.add_argument("--cost_estimate", default=False, action="store_true",
+                        help="Before the full run, run one item per modality and model, print the estimated cost and wait for approval (overrides config).")
+
     parser.add_argument("--disable_zdr", default=False, action="store_true",
                         help="Disable ZDR in the payload, to allow running other audio models that do not support ZDR (overrides config).")
 
@@ -541,6 +599,9 @@ def main():
         config['max_waiting_time_per_request'] = cmdline_args.max_waiting_time_per_request
 
     config['zdr'] = config.get('zdr', True) and not cmdline_args.disable_zdr
+
+    if cmdline_args.cost_estimate:
+        config.setdefault('cost_estimate', {})['enabled'] = True
 
     if cmdline_args.run_id:
         benchmark_run_uuid = cmdline_args.run_id
@@ -627,6 +688,14 @@ def main():
     print(f"Total question/model loops to perform: {total_runs}\n")
 
     no_zdr_models = check_zdr_endpoints(config, resolve_concrete_models(config, items))
+
+    cost_estimate = config.get('cost_estimate', {})
+    if cost_estimate.get('enabled', False):
+        if config['dry_run']:
+            print("Dry run: skipping the cost estimate.")
+        else:
+            estimate_cost(config, items, no_zdr_models)
+            wait_for_approval(cost_estimate.get('approval_timeout_seconds', 120), cost_estimate.get('on_timeout', 'stop'))
 
     # Prepare the log TSV headers
     log_headers = headers + [

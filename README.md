@@ -147,6 +147,8 @@ bash prepare_data_choral_synth.sh
     --benchmark_file test_benchmark.tsv \
     --models "openai/gpt-4o"
 ```
+To see the expected cost first, add `--cost_estimate`: one item per modality is run for each model (these calls are paid), the estimated total is printed, and the full run waits for you to press Enter. Without approval within `cost_estimate.approval_timeout_seconds`, `cost_estimate.on_timeout` in `eval-config.yaml` decides whether the run stops or continues.
+
 See the logs from the benchmark evaluation in `logs/run_<datetime><other>/logs.tsv` (full API errors are in `api_errors.log` next to it), and the result table in `results/<model>/<benchmark-size>/<setup>`.
 
 ## Custom datasets, formats and questions

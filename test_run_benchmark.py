@@ -12,11 +12,13 @@ To run:
 .venv/bin/python3 test_run_benchmark.py
 """
 
+import csv
 import json
 import os
 import pathlib
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -107,17 +109,20 @@ class PromptCachingTests(unittest.TestCase):
         self.assertIn("cache_control", content[0])
 
 
+def make_item(item_id: str, modality: str, context_file: str) -> dict:
+    return {"item_id": item_id, "question": "Which note?", "labeled_final_options": json.dumps(["(A) G4", "(B) F4"]),
+            "all_choices": json.dumps(["A", "B"]), "index2ans": json.dumps({"A": "G4", "B": "F4"}),
+            "label_of_final_correct_option": "A", "path_to_question_context_file": context_file,
+            "modality": modality, "submodality": f"{modality}.abc.txt"}
+
+
 def write_benchmark(path: str, context_file: str, modalities=("symbolic",)):
     """Writes a tiny benchmark TSV with one item per given modality."""
-    columns = ["item_id", "question", "labeled_final_options", "all_choices", "index2ans", "label_of_final_correct_option",
-               "path_to_question_context_file", "modality", "submodality"]
-    options = json.dumps(["(A) G4", "(B) F4"])
-    with open(path, "w", encoding="utf-8") as f:
-        print("\t".join(columns), file=f)
-        for i, modality in enumerate(modalities):
-            row = [f"item{i}", "Which note?", options, json.dumps(["A", "B"]), json.dumps({"A": "G4", "B": "F4"}), "A",
-                   context_file, modality, f"{modality}.abc.txt"]
-            print("\t".join(row), file=f)
+    items = [make_item(f"item{i}", modality, context_file) for i, modality in enumerate(modalities)]
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(items[0]), delimiter="\t")
+        writer.writeheader()
+        writer.writerows(items)
 
 
 class MainTestCase(unittest.TestCase):
@@ -187,6 +192,92 @@ class ZdrTests(MainTestCase):
             post = self.run_main(overrides, argv, zdr_models=())
             self.assertEqual(self.sent_zdr(post), {"m": False})
             self.get.assert_not_called()
+
+
+class WaitForApprovalTests(unittest.TestCase):
+    def wait(self, stdin_text=None, close=False, timeout=0.01, on_timeout="stop"):
+        read_end, write_end = os.pipe()
+        with os.fdopen(read_end) as stdin, os.fdopen(write_end, "w") as writer, mock.patch.object(sys, "stdin", stdin):
+            if stdin_text:
+                writer.write(stdin_text)
+                writer.flush()
+            if close:
+                writer.close()
+            run_benchmark.wait_for_approval(timeout, on_timeout)
+
+    def test_enter_approves(self):
+        self.wait("\n", timeout=30)
+
+    def test_timeout_stops_with_error(self):
+        with self.assertRaises(SystemExit) as exit_info:
+            self.wait()
+        self.assertIn("No approval", str(exit_info.exception.code))
+
+    def test_timeout_can_continue(self):
+        self.wait(on_timeout="continue")
+
+    def test_closed_stdin_does_not_wait_and_is_no_approval(self):
+        start = time.monotonic()
+        with self.assertRaises(SystemExit):
+            self.wait(close=True, timeout=30)
+        self.wait(close=True, timeout=30, on_timeout="continue")
+        self.assertLess(time.monotonic() - start, 5)
+
+
+class CostEstimateTests(MainTestCase):
+    def estimate(self, items, post_response=None):
+        with open("eval-config.yaml", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        config.update({"models": ["m1", "m2"], "dry_run": False, "zdr": True, "api_error_log": None})
+        post = mock.Mock(side_effect=lambda *a, **k: post_response(k["json"]) if post_response else fake_response(200, self.api_response))
+        with mock.patch.object(run_benchmark.requests, "post", post):
+            return run_benchmark.estimate_cost(config, items, set()), post
+
+    def context_file_of_size(self, size):
+        path = os.path.join(self.tmp, f"{size}.txt")
+        pathlib.Path(path).write_text("x" * size)
+        return path
+
+    def test_scales_each_modality_by_its_item_count_per_model(self):
+        items = [make_item(str(i), "symbolic", self.context_file) for i in range(3)] + [make_item("v", "visual", self.context_file)]
+        (total, complete), post = self.estimate(items)
+        self.assertEqual(post.call_count, 4)
+        self.assertAlmostEqual(total, 2 * (3 + 1) * 0.01)
+        self.assertTrue(complete)
+
+    def test_samples_the_median_context_size(self):
+        items = [make_item(str(size), "symbolic", self.context_file_of_size(size)) for size in (300, 1, 20)]
+        _, post = self.estimate(items)
+        sent = post.call_args_list[0].kwargs["json"]["messages"][-1]["content"]
+        self.assertTrue(any("x" * 20 in part["text"] and "x" * 21 not in part["text"] for part in sent))
+
+    def test_failed_sample_gives_lower_bound(self):
+        def respond(payload):
+            return fake_response(200, {"error": {"message": "failed"}} if payload["model"] == "m2" else self.api_response)
+        (total, complete), _ = self.estimate([make_item("1", "symbolic", self.context_file)], respond)
+        self.assertAlmostEqual(total, 0.01)
+        self.assertFalse(complete)
+
+    def test_approved_run_matches_a_run_without_estimate(self):
+        def seeds(post):
+            return [call.kwargs["json"]["seed"] for call in post.call_args_list]
+        modalities = ("symbolic", "visual")
+        plain = seeds(self.run_main(modalities=modalities))
+        with mock.patch.object(run_benchmark, "wait_for_approval") as wait:
+            estimated = seeds(self.run_main(argv=("--cost_estimate",), modalities=modalities))
+        wait.assert_called_once_with(120, "stop")
+        self.assertEqual(estimated[2:], plain)
+
+    def test_refused_run_sends_only_the_samples(self):
+        with mock.patch.object(run_benchmark, "wait_for_approval", side_effect=SystemExit("stop")), self.assertRaises(SystemExit):
+            self.run_main({"cost_estimate": {"enabled": True}}, modalities=("symbolic", "visual"))
+        self.assertEqual(self.post.call_count, 2)
+
+    def test_off_by_default_and_skipped_on_dry_run(self):
+        with mock.patch.object(run_benchmark, "estimate_cost") as estimate:
+            self.run_main()
+            self.run_main(argv=("--cost_estimate", "--dry_run"))
+        estimate.assert_not_called()
 
 
 if __name__ == "__main__":

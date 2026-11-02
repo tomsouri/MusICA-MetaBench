@@ -67,6 +67,12 @@ prompt_caching:
   # the default order (question first), where close to nothing is cached.
   file_first: false
   ttl: null # null for the provider default (5 minutes on Anthropic), "1h" for longer (higher cache write price, Anthropic only).
+# Cost estimate: first run one item per modality for every model (paid, results discarded), print the estimated cost
+# of the full run, and wait for approval by pressing Enter. Can be turned on by command line argument --cost_estimate
+cost_estimate:
+  enabled: false
+  approval_timeout_seconds: 120
+  on_timeout: stop # stop | continue: what happens without approval in time. Also applies at once when there is no stdin (e.g. in sbatch).
 
 # Filter benchmark items by any column. Only items with the specified values will be processed.
 # Leave as an empty list (or remove) to process all items.
