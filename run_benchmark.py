@@ -344,6 +344,73 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300, error_log
     return {"error": "Max waiting time exceeded.", "original_errors": errors, "last_response": last_response}
 
 
+def build_item_request(config: dict, model: str, item: dict, seed: int, no_zdr_models: set) -> Tuple[Dict, str, str]:
+    """Prepares the request for a (model, benchmark-item) pair. Returns (payload, final_prompt, content_file)."""
+    # Prepare User Prompt
+    options = json.loads(item['labeled_final_options'])
+    labels = json.loads(item['all_choices'])
+    options_text = "\n".join(options)
+
+    fmt_info = config['musical_piece_format_info']
+    modality = item.get('modality')
+    submodality = item.get('submodality')
+    format_desc = fmt_info.get(modality, {}).get(submodality, "a musical excerpt")
+
+    print(f"Modality: {modality:>10} | Submodality: {submodality:>19} | Question: {item['question']}")
+    print(f"Options: " + ", ".join(options))
+
+    prompt = config['user_prompt_template']
+    prompt = prompt.replace("<FORMAT>", format_desc)
+    prompt = prompt.replace("<QUESTION>", item['question'])
+    prompt = prompt.replace("<OPTIONS_TEXT>", options_text)
+    prompt = prompt.replace("<OPTION_LABELS>", ', '.join(labels))
+
+    # Build Payload
+    content_file = item['path_to_question_context_file']
+    text_only_baseline = config.get('text_only_baseline', False)
+
+    white_noise_baseline = config.get('white_noise_baseline', False)
+    if text_only_baseline and white_noise_baseline:
+        raise ValueError("Both text_only_baseline and white_noise_baseline cannot be true at the same time. Please choose one baseline or neither.")
+
+    if white_noise_baseline:
+        print("White noise baseline is enabled. Replacing content file with white noise.")
+        if submodality == "audio.mastermix.wav":
+            content_file = "data/white_noise/audio.mastermix.wav"
+        elif submodality == "visual.short.png":
+            content_file = "data/white_noise/visual.short.png"
+        elif submodality == "symbolic.musicxml":
+            content_file = "data/white_noise/symbolic.musicxml"
+        elif submodality == "symbolic.abc.txt":
+            content_file = "data/white_noise/symbolic.abc.txt"
+        else:
+            raise ValueError(f"No white noise file available for submodality {submodality}. Please check the config or provide a white noise file for this submodality.")
+
+    supported_aggregate_models = config.get("supported_aggregate_models", {})
+    if model in supported_aggregate_models:
+        print(f"Model {model} is an aggregate model. Using supported aggregate model {supported_aggregate_models[model]} for payload preparation.")
+        model_name = supported_aggregate_models[model][modality]
+    else:
+        model_name = model
+
+    print(f"Running model: #{model_name}#")
+
+    payload, final_prompt = prepare_llm_payload(
+        model=model_name, 
+        user_prompt=prompt, 
+        system_prompt=config['system_prompt'], 
+        content_file=content_file, 
+        modality=modality, 
+        submodality=submodality,
+        no_content_file=text_only_baseline,
+        zdr=config['zdr'] and model_name not in no_zdr_models,
+        inference_seed=seed,
+        prompt_caching=config.get('prompt_caching')
+    )
+
+    return payload, final_prompt, content_file
+
+
 def resolve_concrete_models(config: dict, items: list) -> list:
     """Returns the models actually sent to the API, expanding aggregates over the modalities present in items."""
     aggregates = config.get("supported_aggregate_models", {})
@@ -574,60 +641,11 @@ def main():
 
     all_executed_logs = []
     run_count = 0
-    supported_aggregate_models = config.get("supported_aggregate_models", {})
 
     for model in config['models']:
         for item in items:
             run_count += 1
             print(f"\n[{run_count}/{total_runs}] Running Model: {model} | Item ID: {item.get('item_id')}")
-
-            # Prepare User Prompt
-            options = json.loads(item['labeled_final_options'])
-            labels = json.loads(item['all_choices'])
-            options_text = "\n".join(options)
-
-            fmt_info = config['musical_piece_format_info']
-            modality = item.get('modality')
-            submodality = item.get('submodality')
-            format_desc = fmt_info.get(modality, {}).get(submodality, "a musical excerpt")
-
-            print(f"Modality: {modality:>10} | Submodality: {submodality:>19} | Question: {item['question']}")
-            print(f"Options: " + ", ".join(options))
-
-            prompt = config['user_prompt_template']
-            prompt = prompt.replace("<FORMAT>", format_desc)
-            prompt = prompt.replace("<QUESTION>", item['question'])
-            prompt = prompt.replace("<OPTIONS_TEXT>", options_text)
-            prompt = prompt.replace("<OPTION_LABELS>", ', '.join(labels))
-
-            # Build Payload
-            content_file = item['path_to_question_context_file']
-            text_only_baseline = config.get('text_only_baseline', False)
-
-            white_noise_baseline = config.get('white_noise_baseline', False)
-            if text_only_baseline and white_noise_baseline:
-                raise ValueError("Both text_only_baseline and white_noise_baseline cannot be true at the same time. Please choose one baseline or neither.")
-
-            if white_noise_baseline:
-                print("White noise baseline is enabled. Replacing content file with white noise.")
-                if submodality == "audio.mastermix.wav":
-                    content_file = "data/white_noise/audio.mastermix.wav"
-                elif submodality == "visual.short.png":
-                    content_file = "data/white_noise/visual.short.png"
-                elif submodality == "symbolic.musicxml":
-                    content_file = "data/white_noise/symbolic.musicxml"
-                elif submodality == "symbolic.abc.txt":
-                    content_file = "data/white_noise/symbolic.abc.txt"
-                else:
-                    raise ValueError(f"No white noise file available for submodality {submodality}. Please check the config or provide a white noise file for this submodality.")
-
-            if model in supported_aggregate_models:
-                print(f"Model {model} is an aggregate model. Using supported aggregate model {supported_aggregate_models[model]} for payload preparation.")
-                model_name = supported_aggregate_models[model][modality]
-            else:
-                model_name = model
-
-            print(f"Running model: #{model_name}#")
 
             if config.get('seed', None) is None:
                 print("Warning: No seed provided for inference. The inference will be completely non-deterministic.")
@@ -636,18 +654,7 @@ def main():
                 current_seed_for_inference = config['rng'].integers(0, 1e9)
                 print(f"Using seed {current_seed_for_inference} for inference.")
 
-            payload, final_prompt = prepare_llm_payload(
-                model=model_name, 
-                user_prompt=prompt, 
-                system_prompt=config['system_prompt'], 
-                content_file=content_file, 
-                modality=modality, 
-                submodality=submodality,
-                no_content_file=text_only_baseline,
-                zdr=config['zdr'] and model_name not in no_zdr_models,
-                inference_seed=current_seed_for_inference,
-                prompt_caching=config.get('prompt_caching')
-            )
+            payload, final_prompt, content_file = build_item_request(config, model, item, current_seed_for_inference, no_zdr_models)
 
             # Execute Request
             cost, time_taken, full_json, resp_text = ask_model(config, payload, final_prompt, config['dry_run'])
@@ -669,6 +676,8 @@ def main():
             is_correct = (extracted_answer == correct_label) if extracted_answer else "EXTRACTION FAILED"
 
             # Logging Logic
+            text_only_baseline = config.get('text_only_baseline', False)
+            white_noise_baseline = config.get('white_noise_baseline', False)
             log_row = item.copy()
             model_str = "text-only-" + model if text_only_baseline else ("white-noise-" + model if white_noise_baseline else model)
             log_row.update({
