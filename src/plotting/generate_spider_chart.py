@@ -22,7 +22,10 @@ def shorten_model_name(name):
         'aggregate-gpt-4o': 'agg-GPT-4o',
         'aggregate-gpt-5': 'agg-GPT-5',
         'aggregate-mistral': 'agg-Mistral',
-        'aggregate-gpt-5-full': 'agg-GPT-5 Full'
+        'aggregate-gpt-5-full': 'agg-GPT-5 Full',
+        'google_gemini-4-argon': 'Gemini 4 Argon',
+        'openai_gpt-6-astra': 'GPT-6 Astra',
+        'anthropic_claude-opus-5.5': 'Claude Opus 5.5'
     }
     if name in mapping:
         return mapping[name]
@@ -33,7 +36,7 @@ def shorten_model_name(name):
         return name[:12] + '...'
     return name
 
-def generate_spider_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, compact=False):
+def generate_spider_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, compact=False, extended_palette=False):
     # Load data
     df = pd.read_csv(input_file, sep='\t')
     
@@ -83,6 +86,8 @@ def generate_spider_chart(input_file, output_file, criterion_type, excluded_mode
         
     # High contrast, colorblind-friendly color palette
     cb_colors = ['#0077BB', '#EE7733', '#009988', '#CC3311', '#AA4499', '#EECC66']
+    if extended_palette:
+        cb_colors += ['#882255', '#332288', '#999933']
         
     max_accuracy = 0
     for i, model in enumerate(model_columns):
@@ -144,7 +149,8 @@ if __name__ == "__main__":
     parser.add_argument('--baseline', action='store_true', help='Include a random baseline at 20%% accuracy')
     parser.add_argument('--font_size', type=int, default=12, help='Font size for the plot labels and legend')
     parser.add_argument('--compact', action='store_true', help='Make the chart more compact (crop axes at 80%% if possible, rotate chart)')
-    
+    parser.add_argument('--extended_palette', action='store_true', help='Add 3 more colors, so that up to 9 models do not share a color')
+
     args = parser.parse_args()
-    
-    generate_spider_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.compact)
+
+    generate_spider_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.compact, args.extended_palette)

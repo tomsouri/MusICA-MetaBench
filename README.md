@@ -225,6 +225,7 @@ The entry points are:
 | [run_all.sh](run_all.sh) | The entry point for the whole experiment grid. Generates benchmark instances for every seed and size via `generate_benchmarks.sh`, then submits the inference jobs. The seeds, sizes and repetition counts are variables at the top of the file — **edit them before running**, and note that inference costs real money. |
 | [submit_experiments.sh](submit_experiments.sh), [run-multiple-models.sh](run-multiple-models.sh), [run-model-multiple-times.sh](run-model-multiple-times.sh) | Job submission for a cluster, and the loops over models and repetitions that `run_all.sh` drives. |
 | [generate_the_plots.sh](generate_the_plots.sh) | Regenerates the figures in `aggregated/results-for-paper/` from the aggregated result tables already in this repository. This one needs no inference and no API key. |
+| [PLOTS.md](PLOTS.md) | How to add new models to the plots and tables, and how to render them for print. |
 | [compute_mean_stddev.py](compute_mean_stddev.py), [pairwise_significance.py](pairwise_significance.py), [test_normality.py](test_normality.py), [generate_aggregated_table.py](generate_aggregated_table.py), [generate_averaged_tables.py](generate_averaged_tables.py) | Aggregation, significance testing and the LaTeX/TSV tables used in the paper. |
 | [aggregate_results_for_determining_benchmark_size.py](aggregate_results_for_determining_benchmark_size.py), [determine_benchmark_size.sh](determine_benchmark_size.sh) | The benchmark-size calibration behind the "~300 items suffice" figure. |
 

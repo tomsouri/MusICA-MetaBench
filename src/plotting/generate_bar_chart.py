@@ -22,7 +22,10 @@ def shorten_model_name(name):
         'aggregate-gpt-4o': 'agg-GPT-4o',
         'aggregate-gpt-5': 'agg-GPT-5',
         'aggregate-mistral': 'agg-Mistral',
-        'aggregate-gpt-5-full': 'agg-GPT-5 Full'
+        'aggregate-gpt-5-full': 'agg-GPT-5 Full',
+        'google_gemini-4-argon': 'Gemini 4 Argon',
+        'openai_gpt-6-astra': 'GPT-6 Astra',
+        'anthropic_claude-opus-5.5': 'Claude Opus 5.5'
     }
     if name in mapping:
         return mapping[name]
@@ -36,7 +39,7 @@ def shorten_model_name(name):
 def clean_label(label):
     return str(label).replace('audio.mastermix.wav', 'Audio').replace('symbolic.abc.txt', 'Symbolic (ABC)').replace('visual.short.png', 'Image')
 
-def generate_bar_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, group_by_models, round_to_int, bold_best, sort_per_group, show_names_below, y_limit, height, show_guide_lines, tight_crop):
+def generate_bar_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, group_by_models, round_to_int, bold_best, sort_per_group, show_names_below, y_limit, height, show_guide_lines, tight_crop, width=14, dpi=None, extended_palette=False, marked_models=None):
     # Load data
     df = pd.read_csv(input_file, sep='\t')
     
@@ -69,12 +72,14 @@ def generate_bar_chart(input_file, output_file, criterion_type, excluded_models,
     plt.rcParams.update({'font.size': font_size})
     plt.style.use('tableau-colorblind10') 
 
-    fig, ax = plt.subplots(figsize=(14, height))
+    fig, ax = plt.subplots(figsize=(width, height))
 
     # Colorblind-friendly color palette (Okabe-Ito inspired for the main groups if possible)
     # Using the colors from generate_plot_with_comparison_of_normal_textonly_noise.py
     # and extending them for more categories/models.
     cb_colors = ["#E69F00", "#56B4E9", "#009E73", "#CC79A7", "#F0E442", "#0072B2", "#D55E00", "#000000"]
+    if extended_palette:
+        cb_colors += ["#882255", "#332288", "#999933"]
 
     if group_by_models:
         # Grouped by Models: Each model is a group, columns are criterion values
@@ -96,9 +101,11 @@ def generate_bar_chart(input_file, output_file, criterion_type, excluded_models,
             
             # Add value labels on top
             v_fontsize = font_size * 0.75
-            max_score = max(scores) if scores else 0
+            max_score = np.nanmax(scores) if scores else 0
             for idx, bar in enumerate(bars):
                 height = bar.get_height()
+                if np.isnan(height):
+                    continue
                 label_text = f"{int(round(height))}" if round_to_int else f"{height:.1f}"
                 is_best = bold_best and height == max_score and height > 0
                 fontweight = 'bold' if is_best else 'normal'
@@ -123,15 +130,17 @@ def generate_bar_chart(input_file, output_file, criterion_type, excluded_models,
         # Plot each group
         for i, crit_val in enumerate(criterion_values):
             group_row = filtered_df[filtered_df['Criterion_Value'] == crit_val]
-            
+            # Models without results for this group (e.g. no audio run) are left out of it
+            group_models = [m for m in model_columns if pd.notna(group_row[m].values[0])]
+
             # Use the globally sorted model_columns or sort specifically for this group
             if sort_per_group:
-                group_model_scores = {m: group_row[m].values[0] for m in model_columns}
-                sorted_models_for_group = sorted(model_columns, key=lambda x: group_model_scores[x], reverse=True)
+                group_model_scores = {m: group_row[m].values[0] for m in group_models}
+                sorted_models_for_group = sorted(group_models, key=lambda x: group_model_scores[x], reverse=True)
             else:
-                sorted_models_for_group = model_columns
-                group_model_scores = {m: group_row[m].values[0] for m in model_columns}
-            
+                sorted_models_for_group = group_models
+                group_model_scores = {m: group_row[m].values[0] for m in group_models}
+
             max_score = max(group_model_scores.values()) if group_model_scores else 0
 
             for j, model in enumerate(sorted_models_for_group):
@@ -163,8 +172,10 @@ def generate_bar_chart(input_file, output_file, criterion_type, excluded_models,
                 for j, model in enumerate(sorted_models_for_group):
                     pos = indices[i] + j * bar_width
                     name = shorten_model_name(model)
+                    is_marked = model in (marked_models or [])
                     # Text annotation
-                    t = ax.text(pos, -1, name, rotation=45, ha='right', va='top', fontsize=font_size*0.8)
+                    t = ax.text(pos, -1, name + ('*' if is_marked else ''), rotation=45, ha='right', va='top', fontsize=font_size*0.8,
+                                fontstyle='italic' if is_marked else 'normal')
                     
                     if show_guide_lines:
                         # Draw a dotted line from the name label to the bar base
@@ -188,7 +199,9 @@ def generate_bar_chart(input_file, output_file, criterion_type, excluded_models,
                 ax.axvline(x=mid_sep, color='gray', linestyle=':', linewidth=1)
             
             # Label inside the chart (at the top but below 100)
-            group_center = indices[i] + bar_width * (num_bars_per_group - 1) / 2
+            group_row = filtered_df[filtered_df['Criterion_Value'] == crit_val]
+            num_bars_in_group = int(group_row[model_columns].notna().sum(axis=1).iloc[0])
+            group_center = indices[i] + bar_width * (num_bars_in_group - 1) / 2
             ax.text(group_center, 95, clean_label(crit_val), 
                     ha='center', va='top', fontweight='bold', fontsize=font_size)
 
@@ -226,9 +239,9 @@ def generate_bar_chart(input_file, output_file, criterion_type, excluded_models,
     
     # Save with tight layout or standard padding
     if tight_crop:
-        plt.savefig(output_file, bbox_inches='tight', pad_inches=0.01)
+        plt.savefig(output_file, bbox_inches='tight', pad_inches=0.01, dpi=dpi)
     else:
-        plt.savefig(output_file, bbox_inches='tight')
+        plt.savefig(output_file, bbox_inches='tight', dpi=dpi)
     print(f"Chart saved to {output_file}")
 
 if __name__ == "__main__":
@@ -249,7 +262,11 @@ if __name__ == "__main__":
     parser.add_argument('--height', type=float, default=8, help='Height of the plot in inches (use to shrink/stretch the vertical size)')
     parser.add_argument('--show_guide_lines', action='store_true', help='Show soft dotted guide lines from model names to bars')
     parser.add_argument('--tight_crop', action='store_true', help='Crop the final image to the absolute minimum bounding box')
-    
+    parser.add_argument('--width', type=float, default=14, help='Width of the plot in inches (increase for more models)')
+    parser.add_argument('--dpi', type=int, help='Resolution of raster output such as PNG (default: matplotlib default of 100)')
+    parser.add_argument('--extended_palette', action='store_true', help='Add 3 more colors, so that up to 11 models do not share a color')
+    parser.add_argument('--mark_models', nargs='*', help='Models whose names below the bars are written in italics with an asterisk (with --show_names_below)')
+
     args = parser.parse_args()
-    
-    generate_bar_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.group_by_models, args.round, args.bold_best, args.sort_per_group, args.show_names_below, args.y_limit, args.height, args.show_guide_lines, args.tight_crop)
+
+    generate_bar_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.group_by_models, args.round, args.bold_best, args.sort_per_group, args.show_names_below, args.y_limit, args.height, args.show_guide_lines, args.tight_crop, args.width, args.dpi, args.extended_palette, args.mark_models)
