@@ -542,8 +542,11 @@ class AnswerDistractorExtractors:
             if part_index >= len(score.parts):
                 raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
             target_part = score.parts[part_index]
-            # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-            notes = list(target_part.flatten().getElementsByClass(note.Note))
+            # Flatten the part (to remove measure hierarchies) and extract the notes (and rests, if requested)
+            if rests:
+                notes = list(target_part.flatten().notesAndRests)
+            else:
+                notes = list(target_part.flatten().getElementsByClass(note.Note))
             if not notes:
                 raise ValueError(f"No valid notes found in part '{voice_key}' for the score '{score}'.")  
         return notes, values
@@ -1261,8 +1264,8 @@ class AnswerDistractorExtractors:
             if var_name in self.ontology:
                 if var_name == 'target_index':
                     new_words[var_name] = self.ontology['target_index'][int(value_symbol)][value_symbol]
-                elif var_name == 'voice':
-                    continue
+                elif var_name == 'voice' and self.use_xml_part_names:
+                    continue  # already the part name taken from the MusicXML
                 else:
                     possible_dicts = self.ontology[var_name]
                     for dict_item in possible_dicts:
