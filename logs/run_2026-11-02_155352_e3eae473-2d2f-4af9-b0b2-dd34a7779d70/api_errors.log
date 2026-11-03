@@ -1,0 +1,1 @@
+2026-11-02T16:21:50.250313 Error encountered for openai/gpt-6-astra: HTTPSConnectionPool(host='openrouter.ai', port=443): Read timed out.

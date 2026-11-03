@@ -1,0 +1,55 @@
+Model	Criterion_Type	Criterion_Value	Total_Items	Correct_Items	Incorrect_Items	Unparsable_Items	Model_Error_Items	Accuracy_Percent	Unparsable_Percent	Model_Error_Percent	Total_Time_s	Total_Price
+google/gemini-4-argon	OVERALL	ALL	300	222	78	0	1	74.0	0.0	1.28	6943.95	3.978424
+google/gemini-4-argon	submodality	audio.mastermix.wav	100	64	36	0	1	64.0	0.0	2.78	2673.89	1.068424
+google/gemini-4-argon	submodality	symbolic.abc.txt	100	91	9	0	0	91.0	0.0	0.0	1841.09	1.081002
+google/gemini-4-argon	submodality	visual.short.png	100	67	33	0	0	67.0	0.0	0.0	2428.97	1.828998
+google/gemini-4-argon	piece_id	Anonymous_AusMeinesHerzensGrunde	18	8	10	0	0	44.44	0.0	0.0	429.34	0.311054
+google/gemini-4-argon	piece_id	Bach_IchStehAnDeinerKrippe	33	22	11	0	1	66.67	0.0	9.09	1582.0	0.486306
+google/gemini-4-argon	piece_id	Crueger_AufAufMeinHerzMitFreuden	30	19	11	0	0	63.33	0.0	0.0	917.93	0.682074
+google/gemini-4-argon	piece_id	Drese_JesuGehVoran	39	32	7	0	0	82.05	0.0	0.0	634.67	0.43986
+google/gemini-4-argon	piece_id	Gesius_BefiehlDuDeineWege	24	17	7	0	0	70.83	0.0	0.0	458.3	0.305714
+google/gemini-4-argon	piece_id	Gesius_DuFriedensfuerstHerrJesuChrist	42	30	12	0	0	71.43	0.0	0.0	673.18	0.476824
+google/gemini-4-argon	piece_id	Jan_DuGrosserSchmerzensmann	42	35	7	0	0	83.33	0.0	0.0	768.72	0.507712
+google/gemini-4-argon	piece_id	Telemann_DerLiebenSonneLichtUndPracht	27	20	7	0	0	74.07	0.0	0.0	469.72	0.326664
+google/gemini-4-argon	piece_id	Vulpius_ChristusDerIstMeinLeben	21	20	1	0	0	95.24	0.0	0.0	602.79	0.16649
+google/gemini-4-argon	piece_id	Vulpius_DieHelleSonnLeuchtJetztHerfuer	24	19	5	0	0	79.17	0.0	0.0	407.29	0.275726
+google/gemini-4-argon	is_nota_correct	0	240	173	67	0	1	72.08	0.0	1.49	5910.92	3.2499
+google/gemini-4-argon	is_nota_correct	1	60	49	11	0	0	81.67	0.0	0.0	1033.03	0.728524
+google/gemini-4-argon	meta-question_id	1	30	24	6	0	0	80.0	0.0	0.0	496.98	0.34421
+google/gemini-4-argon	meta-question_id	10	21	14	7	0	0	66.67	0.0	0.0	609.29	0.45626
+google/gemini-4-argon	meta-question_id	11	18	6	12	0	0	33.33	0.0	0.0	330.52	0.24292
+google/gemini-4-argon	meta-question_id	2	30	22	8	0	0	73.33	0.0	0.0	439.9	0.269678
+google/gemini-4-argon	meta-question_id	3	30	21	9	0	1	70.0	0.0	11.11	1519.03	0.40407
+google/gemini-4-argon	meta-question_id	4	30	25	5	0	0	83.33	0.0	0.0	890.17	0.396502
+google/gemini-4-argon	meta-question_id	5	30	27	3	0	0	90.0	0.0	0.0	816.17	0.61228
+google/gemini-4-argon	meta-question_id	6	30	25	5	0	0	83.33	0.0	0.0	590.71	0.394902
+google/gemini-4-argon	meta-question_id	7	30	24	6	0	0	80.0	0.0	0.0	540.77	0.381834
+google/gemini-4-argon	meta-question_id	8	30	13	17	0	0	43.33	0.0	0.0	517.19	0.353436
+google/gemini-4-argon	meta-question_id	9	21	21	0	0	0	100.0	0.0	0.0	193.22	0.122332
+google/gemini-4-argon	category	harmony	60	41	19	0	0	68.33	0.0	0.0	1133.04	0.821512
+google/gemini-4-argon	category	pitch	120	92	28	0	1	76.67	0.0	3.57	3346.08	1.41446
+google/gemini-4-argon	category	rhythm	120	89	31	0	0	74.17	0.0	0.0	2464.84	1.742452
+google/gemini-4-argon	subcategory	harmonic-recognition	60	41	19	0	0	68.33	0.0	0.0	1133.04	0.821512
+google/gemini-4-argon	subcategory	interval-recognition	60	46	14	0	1	76.67	0.0	7.14	2409.19	0.800572
+google/gemini-4-argon	subcategory	pitch-recognition	60	46	14	0	0	76.67	0.0	0.0	936.88	0.613888
+google/gemini-4-argon	subcategory	proportion-recognition	60	37	23	0	0	61.67	0.0	0.0	1057.96	0.73527
+google/gemini-4-argon	subcategory	rhythmic-recognition	60	52	8	0	0	86.67	0.0	0.0	1406.88	1.007182
+google/gemini-4-argon	skill	cadence recognition	18	6	12	0	0	33.33	0.0	0.0	330.52	0.24292
+google/gemini-4-argon	skill	chord recognition	21	14	7	0	0	66.67	0.0	0.0	609.29	0.45626
+google/gemini-4-argon	skill	interval recognition	30	21	9	0	1	70.0	0.0	11.11	1519.03	0.40407
+google/gemini-4-argon	skill	interval statistics	30	25	5	0	0	83.33	0.0	0.0	890.17	0.396502
+google/gemini-4-argon	skill	note length	30	27	3	0	0	90.0	0.0	0.0	816.17	0.61228
+google/gemini-4-argon	skill	note length statistics	30	25	5	0	0	83.33	0.0	0.0	590.71	0.394902
+google/gemini-4-argon	skill	pitch recognition	30	24	6	0	0	80.0	0.0	0.0	496.98	0.34421
+google/gemini-4-argon	skill	pitch statistics	30	22	8	0	0	73.33	0.0	0.0	439.9	0.269678
+google/gemini-4-argon	skill	rhythm pattern	30	24	6	0	0	80.0	0.0	0.0	540.77	0.381834
+google/gemini-4-argon	skill	rhythm pattern statistics	30	13	17	0	0	43.33	0.0	0.0	517.19	0.353436
+google/gemini-4-argon	skill	tonality recognition	21	21	0	0	0	100.0	0.0	0.0	193.22	0.122332
+google/gemini-4-argon	rel/abs	absolute	141	112	29	0	0	79.43	0.0	0.0	2953.05	2.07733
+google/gemini-4-argon	rel/abs	relative	159	110	49	0	1	69.18	0.0	2.04	3990.9	1.901094
+google/gemini-4-argon	specification	harmony-absolute	21	14	7	0	0	66.67	0.0	0.0	609.29	0.45626
+google/gemini-4-argon	specification	harmony-relative	39	27	12	0	0	69.23	0.0	0.0	523.75	0.365252
+google/gemini-4-argon	specification	pitch-absolute	60	46	14	0	0	76.67	0.0	0.0	936.88	0.613888
+google/gemini-4-argon	specification	pitch-relative	60	46	14	0	1	76.67	0.0	7.14	2409.19	0.800572
+google/gemini-4-argon	specification	rhythm-absolute	60	52	8	0	0	86.67	0.0	0.0	1406.88	1.007182
+google/gemini-4-argon	specification	rhythm-relative	60	37	23	0	0	61.67	0.0	0.0	1057.96	0.73527

@@ -1,0 +1,54 @@
+Model	Criterion_Type	Criterion_Value	Total_Items	Correct_Items	Incorrect_Items	Unparsable_Items	Model_Error_Items	Accuracy_Percent	Unparsable_Percent	Model_Error_Percent	Total_Time_s	Total_Price
+anthropic/claude-opus-5.5	OVERALL	ALL	200	140	60	0	1	70.0	0.0	1.67	3269.47	4.325524
+anthropic/claude-opus-5.5	submodality	symbolic.abc.txt	100	81	19	0	0	81.0	0.0	0.0	839.5	1.85898
+anthropic/claude-opus-5.5	submodality	visual.short.png	100	59	41	0	1	59.0	0.0	2.44	2429.97	2.466544
+anthropic/claude-opus-5.5	piece_id	Anonymous_AusMeinesHerzensGrunde	12	5	7	0	0	41.67	0.0	0.0	195.0	0.3652
+anthropic/claude-opus-5.5	piece_id	Bach_IchStehAnDeinerKrippe	22	12	10	0	0	54.55	0.0	0.0	332.53	0.621404
+anthropic/claude-opus-5.5	piece_id	Crueger_AufAufMeinHerzMitFreuden	20	10	10	0	1	50.0	0.0	10.0	1098.08	0.393856
+anthropic/claude-opus-5.5	piece_id	Drese_JesuGehVoran	26	21	5	0	0	80.77	0.0	0.0	307.62	0.547152
+anthropic/claude-opus-5.5	piece_id	Gesius_BefiehlDuDeineWege	16	10	6	0	0	62.5	0.0	0.0	186.7	0.318988
+anthropic/claude-opus-5.5	piece_id	Gesius_DuFriedensfuerstHerrJesuChrist	28	16	12	0	0	57.14	0.0	0.0	325.78	0.593132
+anthropic/claude-opus-5.5	piece_id	Jan_DuGrosserSchmerzensmann	28	24	4	0	0	85.71	0.0	0.0	347.54	0.643916
+anthropic/claude-opus-5.5	piece_id	Telemann_DerLiebenSonneLichtUndPracht	18	15	3	0	0	83.33	0.0	0.0	188.28	0.343436
+anthropic/claude-opus-5.5	piece_id	Vulpius_ChristusDerIstMeinLeben	14	13	1	0	0	92.86	0.0	0.0	107.9	0.189976
+anthropic/claude-opus-5.5	piece_id	Vulpius_DieHelleSonnLeuchtJetztHerfuer	16	14	2	0	0	87.5	0.0	0.0	180.04	0.308464
+anthropic/claude-opus-5.5	is_nota_correct	0	158	111	47	0	1	70.25	0.0	2.13	2757.49	3.362484
+anthropic/claude-opus-5.5	is_nota_correct	1	42	29	13	0	0	69.05	0.0	0.0	511.98	0.96304
+anthropic/claude-opus-5.5	meta-question_id	1	20	14	6	0	0	70.0	0.0	0.0	248.59	0.450056
+anthropic/claude-opus-5.5	meta-question_id	10	14	9	5	0	0	64.29	0.0	0.0	228.2	0.425116
+anthropic/claude-opus-5.5	meta-question_id	11	12	5	7	0	0	41.67	0.0	0.0	207.01	0.366276
+anthropic/claude-opus-5.5	meta-question_id	2	20	14	6	0	0	70.0	0.0	0.0	208.45	0.353096
+anthropic/claude-opus-5.5	meta-question_id	3	20	14	6	0	1	70.0	0.0	16.67	1141.44	0.446976
+anthropic/claude-opus-5.5	meta-question_id	4	20	18	2	0	0	90.0	0.0	0.0	248.78	0.484268
+anthropic/claude-opus-5.5	meta-question_id	5	20	14	6	0	0	70.0	0.0	0.0	219.52	0.408048
+anthropic/claude-opus-5.5	meta-question_id	6	20	16	4	0	0	80.0	0.0	0.0	176.63	0.32656
+anthropic/claude-opus-5.5	meta-question_id	7	20	15	5	0	0	75.0	0.0	0.0	245.71	0.460228
+anthropic/claude-opus-5.5	meta-question_id	8	20	7	13	0	0	35.0	0.0	0.0	249.16	0.462876
+anthropic/claude-opus-5.5	meta-question_id	9	14	14	0	0	0	100.0	0.0	0.0	95.99	0.142024
+anthropic/claude-opus-5.5	category	harmony	40	28	12	0	0	70.0	0.0	0.0	531.2	0.933416
+anthropic/claude-opus-5.5	category	pitch	80	60	20	0	1	75.0	0.0	5.0	1847.25	1.734396
+anthropic/claude-opus-5.5	category	rhythm	80	52	28	0	0	65.0	0.0	0.0	891.02	1.657712
+anthropic/claude-opus-5.5	subcategory	harmonic-recognition	40	28	12	0	0	70.0	0.0	0.0	531.2	0.933416
+anthropic/claude-opus-5.5	subcategory	interval-recognition	40	32	8	0	1	80.0	0.0	12.5	1390.21	0.931244
+anthropic/claude-opus-5.5	subcategory	pitch-recognition	40	28	12	0	0	70.0	0.0	0.0	457.04	0.803152
+anthropic/claude-opus-5.5	subcategory	proportion-recognition	40	22	18	0	0	55.0	0.0	0.0	494.87	0.923104
+anthropic/claude-opus-5.5	subcategory	rhythmic-recognition	40	30	10	0	0	75.0	0.0	0.0	396.15	0.734608
+anthropic/claude-opus-5.5	skill	cadence recognition	12	5	7	0	0	41.67	0.0	0.0	207.01	0.366276
+anthropic/claude-opus-5.5	skill	chord recognition	14	9	5	0	0	64.29	0.0	0.0	228.2	0.425116
+anthropic/claude-opus-5.5	skill	interval recognition	20	14	6	0	1	70.0	0.0	16.67	1141.44	0.446976
+anthropic/claude-opus-5.5	skill	interval statistics	20	18	2	0	0	90.0	0.0	0.0	248.78	0.484268
+anthropic/claude-opus-5.5	skill	note length	20	14	6	0	0	70.0	0.0	0.0	219.52	0.408048
+anthropic/claude-opus-5.5	skill	note length statistics	20	16	4	0	0	80.0	0.0	0.0	176.63	0.32656
+anthropic/claude-opus-5.5	skill	pitch recognition	20	14	6	0	0	70.0	0.0	0.0	248.59	0.450056
+anthropic/claude-opus-5.5	skill	pitch statistics	20	14	6	0	0	70.0	0.0	0.0	208.45	0.353096
+anthropic/claude-opus-5.5	skill	rhythm pattern	20	15	5	0	0	75.0	0.0	0.0	245.71	0.460228
+anthropic/claude-opus-5.5	skill	rhythm pattern statistics	20	7	13	0	0	35.0	0.0	0.0	249.16	0.462876
+anthropic/claude-opus-5.5	skill	tonality recognition	14	14	0	0	0	100.0	0.0	0.0	95.99	0.142024
+anthropic/claude-opus-5.5	rel/abs	absolute	94	67	27	0	0	71.28	0.0	0.0	1081.4	1.962876
+anthropic/claude-opus-5.5	rel/abs	relative	106	73	33	0	1	68.87	0.0	3.03	2188.07	2.362648
+anthropic/claude-opus-5.5	specification	harmony-absolute	14	9	5	0	0	64.29	0.0	0.0	228.2	0.425116
+anthropic/claude-opus-5.5	specification	harmony-relative	26	19	7	0	0	73.08	0.0	0.0	303.0	0.5083
+anthropic/claude-opus-5.5	specification	pitch-absolute	40	28	12	0	0	70.0	0.0	0.0	457.04	0.803152
+anthropic/claude-opus-5.5	specification	pitch-relative	40	32	8	0	1	80.0	0.0	12.5	1390.21	0.931244
+anthropic/claude-opus-5.5	specification	rhythm-absolute	40	30	10	0	0	75.0	0.0	0.0	396.15	0.734608
+anthropic/claude-opus-5.5	specification	rhythm-relative	40	22	18	0	0	55.0	0.0	0.0	494.87	0.923104

@@ -1,0 +1,54 @@
+Model	Criterion_Type	Criterion_Value	Total_Items	Correct_Items	Incorrect_Items	Unparsable_Items	Model_Error_Items	Accuracy_Percent	Unparsable_Percent	Model_Error_Percent	Total_Time_s	Total_Price
+openai/gpt-6-astra	OVERALL	ALL	200	130	70	0	1	65.0	0.0	1.43	6040.26	9.490827
+openai/gpt-6-astra	submodality	symbolic.abc.txt	100	88	12	0	0	88.0	0.0	0.0	601.56	1.643098
+openai/gpt-6-astra	submodality	visual.short.png	100	42	58	0	1	42.0	0.0	1.72	5438.7	7.84773
+openai/gpt-6-astra	piece_id	Anonymous_AusMeinesHerzensGrunde	12	6	6	0	0	50.0	0.0	0.0	394.92	0.78449
+openai/gpt-6-astra	piece_id	Bach_IchStehAnDeinerKrippe	22	14	8	0	0	63.64	0.0	0.0	735.56	1.39572
+openai/gpt-6-astra	piece_id	Crueger_AufAufMeinHerzMitFreuden	20	11	9	0	1	55.0	0.0	11.11	1286.09	0.792957
+openai/gpt-6-astra	piece_id	Drese_JesuGehVoran	26	17	9	0	0	65.38	0.0	0.0	580.45	1.05095
+openai/gpt-6-astra	piece_id	Gesius_BefiehlDuDeineWege	16	6	10	0	0	37.5	0.0	0.0	539.51	0.93075
+openai/gpt-6-astra	piece_id	Gesius_DuFriedensfuerstHerrJesuChrist	28	17	11	0	0	60.71	0.0	0.0	666.43	1.17306
+openai/gpt-6-astra	piece_id	Jan_DuGrosserSchmerzensmann	28	22	6	0	0	78.57	0.0	0.0	655.28	1.23999
+openai/gpt-6-astra	piece_id	Telemann_DerLiebenSonneLichtUndPracht	18	12	6	0	0	66.67	0.0	0.0	632.87	1.14217
+openai/gpt-6-astra	piece_id	Vulpius_ChristusDerIstMeinLeben	14	11	3	0	0	78.57	0.0	0.0	239.27	0.43138
+openai/gpt-6-astra	piece_id	Vulpius_DieHelleSonnLeuchtJetztHerfuer	16	14	2	0	0	87.5	0.0	0.0	309.87	0.54936
+openai/gpt-6-astra	is_nota_correct	0	158	100	58	0	1	63.29	0.0	1.72	5095.97	7.693503
+openai/gpt-6-astra	is_nota_correct	1	42	30	12	0	0	71.43	0.0	0.0	944.29	1.797325
+openai/gpt-6-astra	meta-question_id	1	20	12	8	0	0	60.0	0.0	0.0	450.25	0.85182
+openai/gpt-6-astra	meta-question_id	10	14	8	6	0	0	57.14	0.0	0.0	568.7	1.1154
+openai/gpt-6-astra	meta-question_id	11	12	2	10	0	0	16.67	0.0	0.0	591.85	1.05055
+openai/gpt-6-astra	meta-question_id	2	20	13	7	0	1	65.0	0.0	14.29	1373.37	0.829168
+openai/gpt-6-astra	meta-question_id	3	20	12	8	0	0	60.0	0.0	0.0	419.7	0.821468
+openai/gpt-6-astra	meta-question_id	4	20	16	4	0	0	80.0	0.0	0.0	731.0	1.370565
+openai/gpt-6-astra	meta-question_id	5	20	15	5	0	0	75.0	0.0	0.0	300.11	0.590165
+openai/gpt-6-astra	meta-question_id	6	20	16	4	0	0	80.0	0.0	0.0	378.82	0.67691
+openai/gpt-6-astra	meta-question_id	7	20	15	5	0	0	75.0	0.0	0.0	460.56	0.845665
+openai/gpt-6-astra	meta-question_id	8	20	9	11	0	0	45.0	0.0	0.0	481.96	0.873348
+openai/gpt-6-astra	meta-question_id	9	14	12	2	0	0	85.71	0.0	0.0	283.93	0.46577
+openai/gpt-6-astra	category	harmony	40	22	18	0	0	55.0	0.0	0.0	1444.49	2.63172
+openai/gpt-6-astra	category	pitch	80	53	27	0	1	66.25	0.0	3.7	2974.32	3.87302
+openai/gpt-6-astra	category	rhythm	80	55	25	0	0	68.75	0.0	0.0	1621.45	2.986088
+openai/gpt-6-astra	subcategory	harmonic-recognition	40	22	18	0	0	55.0	0.0	0.0	1444.49	2.63172
+openai/gpt-6-astra	subcategory	interval-recognition	40	28	12	0	0	70.0	0.0	0.0	1150.7	2.192032
+openai/gpt-6-astra	subcategory	pitch-recognition	40	25	15	0	1	62.5	0.0	6.67	1823.63	1.680988
+openai/gpt-6-astra	subcategory	proportion-recognition	40	24	16	0	0	60.0	0.0	0.0	942.52	1.719013
+openai/gpt-6-astra	subcategory	rhythmic-recognition	40	31	9	0	0	77.5	0.0	0.0	678.93	1.267075
+openai/gpt-6-astra	skill	cadence recognition	12	2	10	0	0	16.67	0.0	0.0	591.85	1.05055
+openai/gpt-6-astra	skill	chord recognition	14	8	6	0	0	57.14	0.0	0.0	568.7	1.1154
+openai/gpt-6-astra	skill	interval recognition	20	12	8	0	0	60.0	0.0	0.0	419.7	0.821468
+openai/gpt-6-astra	skill	interval statistics	20	16	4	0	0	80.0	0.0	0.0	731.0	1.370565
+openai/gpt-6-astra	skill	note length	20	15	5	0	0	75.0	0.0	0.0	300.11	0.590165
+openai/gpt-6-astra	skill	note length statistics	20	16	4	0	0	80.0	0.0	0.0	378.82	0.67691
+openai/gpt-6-astra	skill	pitch recognition	20	12	8	0	0	60.0	0.0	0.0	450.25	0.85182
+openai/gpt-6-astra	skill	pitch statistics	20	13	7	0	1	65.0	0.0	14.29	1373.37	0.829168
+openai/gpt-6-astra	skill	rhythm pattern	20	15	5	0	0	75.0	0.0	0.0	460.56	0.845665
+openai/gpt-6-astra	skill	rhythm pattern statistics	20	9	11	0	0	45.0	0.0	0.0	481.96	0.873348
+openai/gpt-6-astra	skill	tonality recognition	14	12	2	0	0	85.71	0.0	0.0	283.93	0.46577
+openai/gpt-6-astra	rel/abs	absolute	94	64	30	0	1	68.09	0.0	3.33	3071.26	4.063462
+openai/gpt-6-astra	rel/abs	relative	106	66	40	0	0	62.26	0.0	0.0	2969.0	5.427365
+openai/gpt-6-astra	specification	harmony-absolute	14	8	6	0	0	57.14	0.0	0.0	568.7	1.1154
+openai/gpt-6-astra	specification	harmony-relative	26	14	12	0	0	53.85	0.0	0.0	875.79	1.51632
+openai/gpt-6-astra	specification	pitch-absolute	40	25	15	0	1	62.5	0.0	6.67	1823.63	1.680988
+openai/gpt-6-astra	specification	pitch-relative	40	28	12	0	0	70.0	0.0	0.0	1150.7	2.192032
+openai/gpt-6-astra	specification	rhythm-absolute	40	31	9	0	0	77.5	0.0	0.0	678.93	1.267075
+openai/gpt-6-astra	specification	rhythm-relative	40	24	16	0	0	60.0	0.0	0.0	942.52	1.719013
