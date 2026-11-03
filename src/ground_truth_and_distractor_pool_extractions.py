@@ -77,7 +77,7 @@ def get_tonal_notes():
     
     return notes
 
-def get_rhythm():
+def get_rhythm(include_tuplets=False):
     # We iterate through the official music21 duration types
     # to map their standard quarterLength to their name.
     rhythm_dict = {}
@@ -89,6 +89,9 @@ def get_rhythm():
             # Add single-dotted variant (quarter length * 1.5)
             dotted_ql = quarter_length * 1.5
             rhythm_dict[str(dotted_ql)] = f"dotted-{duration_type}"
+
+    if not include_tuplets:
+        return rhythm_dict
 
     # Add tuplets (common ratios)
     tuplet_names = {
@@ -475,7 +478,7 @@ class AnswerDistractorExtractors:
         
     def build_rhythm_ontology(self, system):
         if system=="tonal":
-            return get_rhythm()
+            return get_rhythm(self.config['music_ontology_settings'].get('include_tuplets', False))
 
         else:
             raise ValueError(f"Unknown hamonic system for harmonical recognition: {system}")

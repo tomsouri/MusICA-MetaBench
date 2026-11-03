@@ -1,0 +1,36 @@
+# Copyright (C) 2026  Tomáš Sourada, Katia Vendrame, Jan Hajič, jr.
+#
+# This file is part of the MusICA MetaBench source code, licensed under
+# the GNU General Public License v3.0 or later (SPDX: GPL-3.0-or-later).
+# See the LICENSE-SOURCE-CODE file in the repository root for the full
+# license text, or <https://www.gnu.org/licenses/>.
+
+target_index:
+  - 0: "first"
+  - 1: "second"
+  - 2: "third"
+  - end: "last"
+
+voice:
+#note that the order of the voices in the ontology.yaml file should be the same as the order of the voices as appear in the xml files (e.g. Soprano, Alto, Tenor, Bass), because we use the index of the voice in the ontology to extract the ground truth and distractor pool for questions about voices (e.g. "what is the pitch of the 3rd note in the Alto voice?") and if the order is different, we might extract the wrong information for the questions
+- "0": "Soprano"
+- "1": "Alto"
+- "2": "Tenor"
+- "3": "Bass"
+
+accidental:
+  - natural: ""
+  - sharp: "sharp"
+  - flat: "flat"
+
+quantity:
+  - max: "most"
+  - min: "least"
+
+modality:
+  - major: "major"
+  - minor: "minor"
+
+function:
+  - tonic: "tonic"
+  - relative minor/major: "relative minor/major"
