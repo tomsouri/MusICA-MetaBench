@@ -121,9 +121,6 @@ bash prepare_data.sh
 
 #### ChoralSynth
 ```bash
-# Checkout to a different branch
-git checkout dataset-choralsynth
-
 # Download ChoralSynth and process it to the required format
 bash prepare_data_choral_synth.sh
 ```
@@ -132,13 +129,29 @@ bash prepare_data_choral_synth.sh
 ## Quick Start
 
 ### Step A: Generate a Benchmark
+Each source dataset has its own generation config:
+
+| Dataset | Config | Pieces list |
+|---|---|---|
+| ChoraleBricks | `benchmark-generation-config-chorale-bricks.yaml` | `pieces-chorale-bricks.tsv` |
+| ChoralSynth | `benchmark-generation-config-choral-synth.yaml` | `pieces-choral-synth.tsv` |
+
+The two configs differ only in the pieces list and in `use_xml_part_names` (ChoralSynth pieces have varying voices, so the voice names are taken from the MusicXML part names instead of the ontology).
+
 ```bash
+# ChoraleBricks
 .venv/bin/python generate_benchmark.py \
-    --config benchmark-generation-config.yaml \
+    --config benchmark-generation-config-chorale-bricks.yaml \
     --benchmark_file test_benchmark.tsv \
-    --questions_per_subcategory_count 10 
+    --questions_per_subcategory_count 10
+
+# ChoralSynth
+.venv/bin/python generate_benchmark.py \
+    --config benchmark-generation-config-choral-synth.yaml \
+    --benchmark_file test_benchmark_choral_synth.tsv \
+    --questions_per_subcategory_count 10
 ```
-*The `questions_per_subcategory_count` parameter specifies questions per category-modality combination.*
+*The `questions_per_subcategory_count` parameter specifies questions per category-modality combination.* Generation is deterministic: the same config and seed always give a byte-identical benchmark file.
 
 ### Step B: Run Inference
 ```bash
@@ -277,13 +290,13 @@ This repository combines original material by the authors with data derived from
 
 | Component | License | Full text |
 | :--- | :--- | :--- |
-| Source code (all `.py` / `.sh` scripts) and original, non-derived data/config (`ontology.yaml`, `meta-questions.tsv`, `pieces.tsv`, `selected_cadences.yaml`, `all_pox_cadence_types.yaml`, `eval-config.yaml`, `benchmark-generation-config.yaml`) | **GPL-3.0-or-later** | [LICENSE](LICENSE) / [LICENSE-SOURCE-CODE](LICENSE-SOURCE-CODE) |
+| Source code (all `.py` / `.sh` scripts) and original, non-derived data/config (`ontology.yaml`, `meta-questions.tsv`, `pieces-*.tsv`, `selected_cadences.yaml`, `all_pox_cadence_types.yaml`, `eval-config.yaml`, `benchmark-generation-config-*.yaml`) | **GPL-3.0-or-later** | [LICENSE](LICENSE) / [LICENSE-SOURCE-CODE](LICENSE-SOURCE-CODE) |
 | Benchmark data **derived from ChoraleBricks** (e.g. `benchmarks/qs_per_subcat_20/seed_52.tsv`) | **CC BY 4.0** | [LICENSE-DATA-CHORALEBRICKS](LICENSE-DATA-CHORALEBRICKS) |
 | Benchmark data **derived from ChoralSynth** (`benchmarks/choralsynth.*.tsv` and the `dataset-choralsynth` branch) | **CC BY-SA 4.0** | [LICENSE-DATA-CHORALSYNTH](LICENSE-DATA-CHORALSYNTH) |
 | `src/mmmu_eval_utils.py` (modified copy of one file from the MMMU-Benchmark project) | **Apache 2.0**, redistributed as part of the GPL-covered source per Apache-2.0 §4 | [LICENSE-THIRD-PARTY-MMMU](LICENSE-THIRD-PARTY-MMMU); see file header for attribution and the list of changes |
 | `results/`, `aggregated/`, `benchmark-comparisons/`, `logs/` (raw and aggregated model outputs, inference logs) | Not separately licensed — provided as-is for reproducibility | — |
 
-Most source files carry a short header identifying them as GPL-3.0-or-later; `meta-questions.tsv` and `pieces.tsv` are GPL-covered too but don't carry an inline header, since prepending a comment line would break the TSV parsing that reads them — their license is documented here instead.
+Most source files carry a short header identifying them as GPL-3.0-or-later; `meta-questions.tsv` and `pieces-*.tsv` are GPL-covered too but don't carry an inline header, since prepending a comment line would break the TSV parsing that reads them — their license is documented here instead.
 
 **Why GPL for code but CC for data:** GPL is designed for software; it doesn't fit non-code creative/data works well, so the two ChoraleBricks/ChoralSynth-derived benchmark data licenses follow the upstream datasets' own terms instead of the code's license.
 

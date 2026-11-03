@@ -6,10 +6,14 @@
 # See the LICENSE-SOURCE-CODE file in the repository root for the full
 # license text, or <https://www.gnu.org/licenses/>.
 set -euo pipefail
+# Fixed collation so the piece order (which affects seeded generation) does not depend on the user's locale
+export LC_ALL=C
 
-# Usage: generate_pieces_list.sh [DATA_DIR]
-DATA_DIR="${1:-data}"
-OUTPUT_FILE="pieces.tsv"
+# Usage: generate_pieces_list.sh DATASET [DATA_DIR]
+# Writes pieces-DATASET.tsv listing all pieces in DATA_DIR/DATASET.
+DATASET="${1:?Usage: generate_pieces_list.sh DATASET [DATA_DIR]}"
+DATA_DIR="${2:-data}"
+OUTPUT_FILE="pieces-$DATASET.tsv"
 
 printf "%s\t%s\t%s\t%s\n" "piece_id" "dataset" "name" "path" > "$OUTPUT_FILE"
 
@@ -21,7 +25,7 @@ fi
 # Expand globs to empty lists rather than literal patterns
 shopt -s nullglob
 
-for dataset_path in "$DATA_DIR"/*/; do
+for dataset_path in "$DATA_DIR/$DATASET"/; do
     [ -d "$dataset_path" ] || continue
     dataset_name=$(basename "$dataset_path")
     echo "Processing dataset: $dataset_name"

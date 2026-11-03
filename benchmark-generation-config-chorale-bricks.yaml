@@ -1,3 +1,10 @@
+# Copyright (C) 2026  Tomáš Sourada, Katia Vendrame, Jan Hajič, jr.
+#
+# This file is part of the MusICA MetaBench source code, licensed under
+# the GNU General Public License v3.0 or later (SPDX: GPL-3.0-or-later).
+# See the LICENSE-SOURCE-CODE file in the repository root for the full
+# license text, or <https://www.gnu.org/licenses/>.
+
 # Step 0: Benchmark Configuration
 
 # How to sort distractors:
@@ -10,7 +17,7 @@ num_options: 5
 nota_text: "none of the other options is correct"
 add_nota: true
 
-questions_per_subcategory_count: 5 # number of questions to generate per subcategory (for the draft, we can keep it small, e.g. 10, and then scale up after analyzing the results and iterating on the question templates)
+questions_per_subcategory_count: 20 # number of questions to generate per subcategory (for the draft, we can keep it small, e.g. 10, and then scale up after analyzing the results and iterating on the question templates)
 
 ontology_path: "ontology.yaml" # Add this to specify the path to the ontology file
 
@@ -21,41 +28,42 @@ ontology_path: "ontology.yaml" # Add this to specify the path to the ontology fi
 submodalities:
   - "audio.mastermix.wav"
   - "visual.short.png"
-  - "symbolic.musicxml"
+  - "symbolic.abc.txt"
 
 # simplification: for the draft, pre-decided percentage of such questions (those that do not contain ground truth among the options), e.g. 20% if we use 5 options (then NOTA is correct as frequently as any other option), only focus on it on evaluation (discussion of results)
 nota_correct_percentage: 0.20 # e.g., 20%
 labels: ["A", "B", "C", "D", "E"]
-seed: 42
+seed: 52
 min_num_distractors: 4
 distractor_pool_size: 5 # number of distractors to sample from the ontology for each question (before sorting and selecting the final options)
 random_distractors: false # whether to sample distractors randomly from the ontology (instead of using piece specific distractors)
 cmdline_args:
   meta: "meta-questions.tsv"
-  pieces: "pieces.tsv"
+  pieces: "pieces-chorale-bricks.tsv"
   methods_path: "src/ground_truth_and_distractor_pool_extractions.py"
   output: "benchmark_v1.tsv"
 
 allowed_metaq_ids:
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-    - 7
-    - 8
-    - 9
-    - 10
-    - 11
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
 
 verbose: true
 use_all_inds: true # whether to use all indices for target_index (instead of just 1, 2, 3, end)
-max_target_index: 20 # Until which index do we ask? (in questions like "what is the 29th note in soprano?") if use_all_inds is True, this is the maximum target index to generate (e.g., if 30, it will generate indices from 0 to 29, plus "end")
+max_target_index: 20 # Number of indices to generate for replacement of <index> wildcard in question templates (in questions like "what is the 29th note in soprano?") if use_all_inds is True, this is the maximum number of indices to generate 
 music_ontology_settings:
   ontology_path: "ontology.yaml"
   harmonic_system: "tonal"
-  use_xml_part_names: true # whether to use the scpore parts defined in the ontology.yaml file under 'voice' (if true, the code will look for the MusicXML partName for every part, and use that in the questions), Default = False
+  use_xml_part_names: false # use the voices defined in the ontology (see benchmark-generation-config-choral-synth.yaml for the alternative)
+
 balance_meta_questions_perfectly: false # whether the per-meta-question counts should be perfectly balanced in the per-subcategory count in the final subsampled benchmark
 allow_meta_question_backoff: true # If set to True, enables the redistribution of missing items to other meta-questions: useful in cases when some meta-questions have a limited number of possible questions and the desired number of questions per subcategory is high.
 
