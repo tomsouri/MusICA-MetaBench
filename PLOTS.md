@@ -71,10 +71,15 @@ This is `submodality-chorale-bricks_s20_seed52_selected-models_grouped_by_modali
       --tight_crop \
       --width 18 \
       --extended_palette \
+      --mark_models google_gemini-4-argon openai_gpt-6-astra anthropic_claude-opus-5.5 \
       --output_file $POSTER/bars_by_modality.pdf
 ```
 
-The three options that differ from the paper version:
+The options that differ from the paper version:
+
+- `--mark_models` writes the names of the listed models in italics with an asterisk. Here it marks the
+  models released after the paper's results (April 2026). The plot does not explain the asterisk, so say
+  what it means in the poster caption.
 
 - `--output_file` with a `.pdf` or `.svg` extension gives vector output, which stays sharp at any print
   size. Prefer this for a poster.

@@ -39,7 +39,7 @@ def shorten_model_name(name):
 def clean_label(label):
     return str(label).replace('audio.mastermix.wav', 'Audio').replace('symbolic.abc.txt', 'Symbolic (ABC)').replace('visual.short.png', 'Image')
 
-def generate_bar_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, group_by_models, round_to_int, bold_best, sort_per_group, show_names_below, y_limit, height, show_guide_lines, tight_crop, width=14, dpi=None, extended_palette=False):
+def generate_bar_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, group_by_models, round_to_int, bold_best, sort_per_group, show_names_below, y_limit, height, show_guide_lines, tight_crop, width=14, dpi=None, extended_palette=False, marked_models=None):
     # Load data
     df = pd.read_csv(input_file, sep='\t')
     
@@ -172,8 +172,10 @@ def generate_bar_chart(input_file, output_file, criterion_type, excluded_models,
                 for j, model in enumerate(sorted_models_for_group):
                     pos = indices[i] + j * bar_width
                     name = shorten_model_name(model)
+                    is_marked = model in (marked_models or [])
                     # Text annotation
-                    t = ax.text(pos, -1, name, rotation=45, ha='right', va='top', fontsize=font_size*0.8)
+                    t = ax.text(pos, -1, name + ('*' if is_marked else ''), rotation=45, ha='right', va='top', fontsize=font_size*0.8,
+                                fontstyle='italic' if is_marked else 'normal')
                     
                     if show_guide_lines:
                         # Draw a dotted line from the name label to the bar base
@@ -263,7 +265,8 @@ if __name__ == "__main__":
     parser.add_argument('--width', type=float, default=14, help='Width of the plot in inches (increase for more models)')
     parser.add_argument('--dpi', type=int, help='Resolution of raster output such as PNG (default: matplotlib default of 100)')
     parser.add_argument('--extended_palette', action='store_true', help='Add 3 more colors, so that up to 11 models do not share a color')
+    parser.add_argument('--mark_models', nargs='*', help='Models whose names below the bars are written in italics with an asterisk (with --show_names_below)')
 
     args = parser.parse_args()
 
-    generate_bar_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.group_by_models, args.round, args.bold_best, args.sort_per_group, args.show_names_below, args.y_limit, args.height, args.show_guide_lines, args.tight_crop, args.width, args.dpi, args.extended_palette)
+    generate_bar_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.group_by_models, args.round, args.bold_best, args.sort_per_group, args.show_names_below, args.y_limit, args.height, args.show_guide_lines, args.tight_crop, args.width, args.dpi, args.extended_palette, args.mark_models)
