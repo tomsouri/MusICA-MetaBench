@@ -1211,8 +1211,6 @@ class AnswerDistractorExtractors:
                 if self.config.get('verbose', False):
                     print(f"Could not match detected cadence '{target_cadence_str}' to any ontology entry. Consider expanding the cadence ontology or check the parsing logic. Added pattern f\"{new_rn1} - {new_rn2}\" to ontology.")
                 
-                with open("selected_cadences.yaml", "w") as f:
-                    yaml.dump(self.dict_cadence_ontology, f)
             
             if not(self.random_distractors):
                 #TODO: very slow to generate all cadences for piece, so for now use just random distractors, because ontology for cadences is quite specific and small.
