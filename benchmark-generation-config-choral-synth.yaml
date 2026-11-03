@@ -62,6 +62,9 @@ max_target_index: 20 # Number of indices to generate for replacement of <index> 
 music_ontology_settings:
   ontology_path: "ontology-choral-synth.yaml"
   harmonic_system: "tonal"
+  include_enharmonic_tonalities: true # add enharmonic spellings (e.g. G- major next to F# major) to the tonality ontology; default false
+  cadences_path: "selected_cadences-choral-synth.yaml" # cadence ontology file; default selected_cadences.yaml
+  dominant_tonality_distractor: false # use the dominant pitch name as a distractor in tonality questions; default true
   include_tuplets: true # add tuplet rhythms (duplet, quintuplet, ...) to the rhythm ontology; default false
   use_xml_part_names: true # use the MusicXML partName of every part as the voice name in questions (needed for datasets with varying voices, e.g. choral-synth); default false uses the voices from the ontology
 

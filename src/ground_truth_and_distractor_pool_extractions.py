@@ -123,12 +123,19 @@ def get_time_signatures():
     ontology = {ts: ts for ts in common_time_signatures}
     return ontology
 
-def get_tonality():
+def get_tonality(include_enharmonics=False):
     modes = ['major', 'minor']  #, 'dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian']
     ontology = {}
     for pc in range(12):
         p = pitch.Pitch()
         p.pitchClass = pc
+
+        if not include_enharmonics:
+            for mode in modes:
+                word = f"{p.name} {mode}"
+                ontology[word] = word
+            ontology[p.name] = p.name # also include the pitch class name alone as a potential answer (e.g., for questions about key signatures without mode specified)
+            continue
         
         # Get both the primary name and its enharmonic equivalent
         pitch_names = {p.name}
@@ -229,15 +236,13 @@ def get_chords():
     return ontology
 
 
-def get_cadence_types():
+def get_cadence_types(ontology_path="selected_cadences.yaml"):
     """
     Loads or builds cadence types ontology.
-    - If selected_cadences.yaml exists, loads it
+    - If ontology_path (default selected_cadences.yaml) exists, loads it
     - Otherwise builds the base list, adds defaults, and saves to file
     - Always ensures the file is saved for persistence
     """
-    ontology_path = "selected_cadences.yaml"
-
     # Try to load existing file
     if os.path.exists(ontology_path):
         with open(ontology_path, 'r') as file:
@@ -445,7 +450,7 @@ class AnswerDistractorExtractors:
     def build_cadence_ontology(self, system):
         if system=="tonal":
             
-            return get_cadence_types()
+            return get_cadence_types(self.config['music_ontology_settings'].get('cadences_path', 'selected_cadences.yaml'))
                 # "V-I": "authentic cadence",
                 # "V-vi": "deceptive cadence",
                 # "IV-I": "plagal cadence",
@@ -472,7 +477,7 @@ class AnswerDistractorExtractors:
 
     def build_tonality_ontology(self, system):
         if system=="tonal":
-            return get_tonality()
+            return get_tonality(self.config['music_ontology_settings'].get('include_enharmonic_tonalities', False))
         else:
             raise ValueError(f"Unknown hamonic system for harmonical recognition: {system}")
         
@@ -1059,7 +1064,8 @@ class AnswerDistractorExtractors:
         else:
             keys_dict["tonic"]  = key_signatures.name
             #keys_dict["dominant"]  = key.Key(key_signatures.getDominant().name, key_signatures.mode).asKey().name
-            #keys_dict["dominant"]  = key_signatures.getDominant().name
+            if self.config['music_ontology_settings'].get('dominant_tonality_distractor', True):
+                keys_dict["dominant"]  = key_signatures.getDominant().name
             keys_dict["relative minor/major"] = key_signatures.relative.name                    
             target_key_signature_name = self.dict_tonality_ontology[keys_dict[harmonic_function]]            
             if not(self.random_distractors):
