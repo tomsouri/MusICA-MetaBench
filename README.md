@@ -147,7 +147,11 @@ bash prepare_data_choral_synth.sh
     --benchmark_file test_benchmark.tsv \
     --models "openai/gpt-4o"
 ```
-See the logs from the benchmark evaluation in `logs/run_<datetime><other>/logs.tsv`, and the result table in `results/<model>/<benchmark-size>/<setup>`.
+To see the expected cost first, add `--cost_estimate`: one item per modality is run for each model (these calls are paid), the estimated total cost and time are printed, and the full run waits for you to press Enter. Without approval within `cost_estimate.approval_timeout_seconds`, `cost_estimate.on_timeout` in `eval-config.yaml` decides whether the run stops or continues.
+
+The estimate is saved to one JSON file per benchmark and model in `cost_estimates/` (`cost_estimate.dir`, `null` to turn this off), with the cost and time of each sampled item and the estimate for the current number of items. If the file exists, its samples are reused without any paid calls, and only modalities missing from it are sampled. A warning is printed if the saved samples used other prompt caching or baseline settings. To replace them, add `--force_rerun_estimate` or set `cost_estimate.force_rerun_estimate: true`.
+
+See the logs from the benchmark evaluation in `logs/run_<datetime><other>/logs.tsv` (full API errors are in `api_errors.log` next to it), and the result table in `results/<model>/<benchmark-size>/<setup>`.
 
 ## Custom datasets, formats and questions
 
@@ -199,9 +203,10 @@ Results, Chorale-bricks, s=300 (20 questions per modality-category pair), one be
   - **Local Deployment:** Qwen-3-omni (specifically `Qwen3-Omni-30B-A3B-Thinking`, full precision) is run locally using [vLLM](https://docs.vllm.ai/) on an NVIDIA GH200 superchip (144GB GPU VRAM).
 - **Data Privacy & Leakage Prevention:**
   - **Leakage Prevention:** Use of endpoints that may train on inputs is disabled.
-  - **Zero Data Retention (ZDR):** Enabled via [OpenRouter ZDR](https://openrouter.ai/docs/guides/features/zdr) where available (note: this was not available for GPT-family audio models).
+  - **Zero Data Retention (ZDR):** Enabled via [OpenRouter ZDR](https://openrouter.ai/docs/guides/features/zdr) where available (note: this was not available for GPT-family audio models). Controlled by `zdr` in the config; before a run, `run_benchmark.py` checks that each model has a ZDR endpoint and stops if not, or turns ZDR off for that model only if `turn_zdr_off_if_no_zdr_endpoint_available` is set.
 - **Inference Configuration:**
   - **Data Encoding:** Symbolic musical files are sent as raw text; audio and image files are sent using Base64 encoding.
+  - **Prompt Caching:** Controlled by `prompt_caching` in the config. Keeping the default question-first order saves close to nothing; `file_first: true` puts the context file before the question to get real cache hits, at the price of a changed prompt.
   - **Parameters:** Models use default parameters to reflect real-world usage, with the exception of the random seed.
   - **Reproducibility:** A pseudo-random seed is generated for each inference call to ensure better reproducibility (successfully achieved for local Qwen-3-omni, though limited for OpenRouter endpoints). We use distributed seeds rather than a single fixed seed to evaluate the model as a distribution rather than a single fixed instance.
 

@@ -54,6 +54,27 @@ env_api_key_name: "OPENROUTER_API_KEY"
 
 max_waiting_time_per_request: 300 # in seconds, after which the request will be considered failed and logged as such
 
+# Zero Data Retention: route requests only to ZDR endpoints. Can be overridden by command line argument --disable_zdr
+# Before running, every model is checked for an available ZDR endpoint, and the run stops with an error if a model has none.
+zdr: true
+turn_zdr_off_if_no_zdr_endpoint_available: false # If true, a model without a ZDR endpoint does not stop the run, ZDR gets turned off for that model only.
+
+# Prompt caching, see https://openrouter.ai/docs/guides/best-practices/prompt-caching
+prompt_caching:
+  enabled: true # If true, a cache_control breakpoint is added to every request. If false, the requests are sent without it.
+  # Caching matches identical prompt prefixes, and every context file is used by several questions, so caching saves
+  # money only with the file before the question. This changes the prompt, so results may not be comparable to runs with
+  # the default order (question first), where close to nothing is cached.
+  file_first: false
+  ttl: null # null for the provider default (5 minutes on Anthropic), "1h" for longer (higher cache write price, Anthropic only).
+# Cost estimate: first run one item per modality for every model (paid, results discarded), print the estimated cost
+# of the full run, and wait for approval by pressing Enter. Can be turned on by command line argument --cost_estimate
+cost_estimate:
+  enabled: false
+  approval_timeout_seconds: 120
+  on_timeout: stop # stop | continue: what happens without approval in time. Also applies at once when there is no stdin (e.g. in sbatch).
+  dir: "cost_estimates" # One JSON file per benchmark and model, reused by later runs. null to neither save nor reuse estimates.
+  force_rerun_estimate: false # If true, rerun the samples even if an estimate file exists. Can be overridden by command line argument --force_rerun_estimate
 
 # Filter benchmark items by any column. Only items with the specified values will be processed.
 # Leave as an empty list (or remove) to process all items.

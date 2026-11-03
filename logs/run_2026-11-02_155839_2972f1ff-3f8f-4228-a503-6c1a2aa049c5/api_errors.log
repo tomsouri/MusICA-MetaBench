@@ -1,0 +1,1 @@
+2026-11-02T16:21:50.795464 Error encountered for anthropic/claude-opus-5.5: HTTPSConnectionPool(host='openrouter.ai', port=443): Read timed out.

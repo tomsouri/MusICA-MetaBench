@@ -92,10 +92,12 @@ import csv
 import datetime
 import json
 import os
+import re
 import sys
 import time
 import uuid
 import random
+import select
 import shutil
 from typing import Dict, Tuple
 import numpy as np
@@ -141,7 +143,21 @@ def set_logdir(config: dict) -> str:
 # Core LLM Call & Payload Builder
 # =========================================================================
 
-def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, content_file: str, modality: str, submodality: str, no_content_file: bool = False, zdr: bool = True, inference_seed: int = None) -> Tuple[Dict, str]:
+def apply_prompt_caching(content: list, ttl: str = None, file_first: bool = False):
+    """Adds a cache breakpoint to the user message content (question, then any attached file), in place."""
+    cache_control = {"type": "ephemeral"}
+    if ttl:
+        cache_control["ttl"] = ttl
+
+    question, *attachment = content
+    if file_first and attachment:
+        # Docs only describe breakpoints on text blocks, so a fixed one follows the file
+        content[:] = [*attachment, {"type": "text", "text": "End of attached material.", "cache_control": cache_control}, question]
+    else:
+        question["cache_control"] = cache_control
+
+
+def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, content_file: str, modality: str, submodality: str, no_content_file: bool = False, zdr: bool = True, inference_seed: int = None, prompt_caching: dict = None) -> Tuple[Dict, str]:
     """Generates the messages payload based on the modality and files."""
     messages = []
     plugins = None
@@ -159,7 +175,7 @@ def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, conten
     else:
         if modality == "visual" and submodality.endswith(".png"):
             base64_image = encode_file_to_base64(content_file)
-            data_url = f"data:image/jpeg;base64,{base64_image}"
+            data_url = f"data:image/png;base64,{base64_image}"
             messages.append({
                 "role": "user",
                 "content": [
@@ -211,6 +227,10 @@ def prepare_llm_payload(model: str, user_prompt: str, system_prompt: str, conten
                 "content": [{"type": "text", "text": user_prompt_clean}]
             }) 
 
+    prompt_caching = prompt_caching or {}
+    if prompt_caching.get("enabled", True):
+        apply_prompt_caching(messages[-1]["content"], prompt_caching.get("ttl"), prompt_caching.get("file_first", False))
+
     payload = {
         "model": model,
         "messages": messages,
@@ -246,7 +266,7 @@ def ask_model(config: dict, payload: dict, original_user_prompt: str, dry_run: b
         return 0.0, time_taken, dummy_json, dummy_json['choices'][0]['message']['content']
 
     max_waiting_time = config.get("max_waiting_time_per_request", 10)
-    response_json = call_api_with_backoff(url, headers, payload, max_waiting_time=max_waiting_time)
+    response_json = call_api_with_backoff(url, headers, payload, max_waiting_time=max_waiting_time, error_log_path=config.get('api_error_log'))
     
     # print(response_json)
 
@@ -259,13 +279,31 @@ def ask_model(config: dict, payload: dict, original_user_prompt: str, dry_run: b
     return cost, time_taken, response_json, response_text
 
 
-def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
+def format_api_error(response: requests.Response) -> str:
+    """Returns the full API error (message, code, metadata), or the raw body if it is not JSON."""
+    try:
+        body = response.json()
+    except ValueError:
+        return response.text
+    return json.dumps(body.get("error", body) if isinstance(body, dict) else body, ensure_ascii=False)
+
+
+def report_api_error(message: str, log_path: str = None):
+    """Prints an API error and appends it to the run's error log."""
+    print(message)
+    if log_path:
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(f"{datetime.datetime.now().isoformat()} {message}\n")
+
+
+def call_api_with_backoff(url, headers, payload, max_waiting_time=300, error_log_path=None):
     """Calls an API with exponential backoff and jitter."""
     start_time = time.time()
     base_delay = 1  
     attempt = 0
 
-    response = {}
+    response = None
+    model = payload.get('model')
 
     errors = []
     
@@ -274,7 +312,11 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
             response = requests.post(url, headers=headers, json=payload, timeout=max_waiting_time)
             # print(json.dumps(response.json(), indent=2))
             response.raise_for_status()
-            return response.json()
+            response_json = response.json()
+            # OpenRouter can report a failure in the body of an HTTP 200 response
+            if "error" in response_json:
+                report_api_error(f"API error for {model} (HTTP {response.status_code}): {format_api_error(response)}", error_log_path)
+            return response_json
             
         except requests.exceptions.RequestException as e:
             # Rather wait for all errors, 429 is "too many requests"
@@ -282,6 +324,12 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
             # if hasattr(e.response, 'status_code') and 400 <= e.response.status_code < 500:
             #     print(f"Fatal error: {e}. Not retrying.")
             #     return {"error": str(e)}
+
+            error = str(e)
+            if e.response is not None:
+                error += f": {format_api_error(e.response)}"
+            errors.append(error)
+            report_api_error(f"Error encountered for {model}: {error}", error_log_path)
             
             delay = min(64, base_delay * (2 ** attempt))
             jitter = random.uniform(0, delay)
@@ -289,16 +337,245 @@ def call_api_with_backoff(url, headers, payload, max_waiting_time=300):
             remaining_time = max_waiting_time - (time.time() - start_time)
             if jitter > remaining_time:
                 break
-
-            errors.append(str(e))
                 
-            print(f"Error encountered: {e}. Retrying in {jitter:.2f}s...")
+            print(f"Retrying in {jitter:.2f}s...")
             time.sleep(jitter)
             attempt += 1
-    # TODO: do not return just max waiting time exceeded, but also log the error that caused the final failure
+
+    last_response = format_api_error(response) if response is not None else None
+    return {"error": "Max waiting time exceeded.", "original_errors": errors, "last_response": last_response}
 
 
-    return {"error": "Max waiting time exceeded.", "original_errors": errors, "last_response": str(response)}
+def build_item_request(config: dict, model: str, item: dict, seed: int, no_zdr_models: set) -> Tuple[Dict, str, str]:
+    """Prepares the request for a (model, benchmark-item) pair. Returns (payload, final_prompt, content_file)."""
+    # Prepare User Prompt
+    options = json.loads(item['labeled_final_options'])
+    labels = json.loads(item['all_choices'])
+    options_text = "\n".join(options)
+
+    fmt_info = config['musical_piece_format_info']
+    modality = item.get('modality')
+    submodality = item.get('submodality')
+    format_desc = fmt_info.get(modality, {}).get(submodality, "a musical excerpt")
+
+    print(f"Modality: {modality:>10} | Submodality: {submodality:>19} | Question: {item['question']}")
+    print(f"Options: " + ", ".join(options))
+
+    prompt = config['user_prompt_template']
+    prompt = prompt.replace("<FORMAT>", format_desc)
+    prompt = prompt.replace("<QUESTION>", item['question'])
+    prompt = prompt.replace("<OPTIONS_TEXT>", options_text)
+    prompt = prompt.replace("<OPTION_LABELS>", ', '.join(labels))
+
+    # Build Payload
+    content_file = item['path_to_question_context_file']
+    text_only_baseline = config.get('text_only_baseline', False)
+
+    white_noise_baseline = config.get('white_noise_baseline', False)
+    if text_only_baseline and white_noise_baseline:
+        raise ValueError("Both text_only_baseline and white_noise_baseline cannot be true at the same time. Please choose one baseline or neither.")
+
+    if white_noise_baseline:
+        print("White noise baseline is enabled. Replacing content file with white noise.")
+        if submodality == "audio.mastermix.wav":
+            content_file = "data/white_noise/audio.mastermix.wav"
+        elif submodality == "visual.short.png":
+            content_file = "data/white_noise/visual.short.png"
+        elif submodality == "symbolic.musicxml":
+            content_file = "data/white_noise/symbolic.musicxml"
+        elif submodality == "symbolic.abc.txt":
+            content_file = "data/white_noise/symbolic.abc.txt"
+        else:
+            raise ValueError(f"No white noise file available for submodality {submodality}. Please check the config or provide a white noise file for this submodality.")
+
+    supported_aggregate_models = config.get("supported_aggregate_models", {})
+    if model in supported_aggregate_models:
+        print(f"Model {model} is an aggregate model. Using supported aggregate model {supported_aggregate_models[model]} for payload preparation.")
+        model_name = supported_aggregate_models[model][modality]
+    else:
+        model_name = model
+
+    print(f"Running model: #{model_name}#")
+
+    payload, final_prompt = prepare_llm_payload(
+        model=model_name, 
+        user_prompt=prompt, 
+        system_prompt=config['system_prompt'], 
+        content_file=content_file, 
+        modality=modality, 
+        submodality=submodality,
+        no_content_file=text_only_baseline,
+        zdr=config['zdr'] and model_name not in no_zdr_models,
+        inference_seed=seed,
+        prompt_caching=config.get('prompt_caching')
+    )
+
+    return payload, final_prompt, content_file
+
+
+def resolve_concrete_models(config: dict, items: list) -> list:
+    """Returns the models actually sent to the API, expanding aggregates over the modalities present in items."""
+    aggregates = config.get("supported_aggregate_models", {})
+    modalities = {item.get('modality') for item in items}
+    concrete = set()
+    for model in config['models']:
+        if model in aggregates:
+            concrete.update(aggregates[model][modality] for modality in modalities)
+        else:
+            concrete.add(model)
+    return sorted(concrete)
+
+
+def check_zdr_endpoints(config: dict, models: list) -> set:
+    """Verifies that every model has a ZDR endpoint. Returns the models for which ZDR gets switched off."""
+    url = config['url']
+    if not config.get('zdr', True):
+        return set()
+    if config.get('dry_run'):
+        print("Dry run: skipping the check of ZDR endpoint availability.")
+        return set()
+    if "openrouter.ai" not in url:
+        print(f"Skipping the check of ZDR endpoint availability, as {url} is not an OpenRouter URL.")
+        return set()
+
+    zdr_url = url.replace("/chat/completions", "/endpoints/zdr")
+    headers = {"Authorization": f"Bearer {os.environ.get(config['env_api_key_name'], '')}"}
+    try:
+        response = requests.get(zdr_url, headers=headers, timeout=60)
+        response.raise_for_status()
+        available = {endpoint.get('model_id') for endpoint in response.json()['data']}
+    except (requests.exceptions.RequestException, KeyError) as e:
+        detail = format_api_error(e.response) if getattr(e, 'response', None) is not None else repr(e)
+        raise ValueError(f"Could not get the list of ZDR endpoints from {zdr_url}, so ZDR availability cannot be verified: {detail}") from e
+
+    missing = {model for model in models if model not in available}
+    if missing and config.get('turn_zdr_off_if_no_zdr_endpoint_available', False):
+        print(f"Warning: no ZDR endpoint available for {sorted(missing)}. Running these models with ZDR turned off.")
+    elif missing:
+        raise ValueError(
+            f"No ZDR endpoint available for {sorted(missing)}. To run with ZDR turned off, use --disable_zdr or set "
+            "'zdr: false' in the config, or set 'turn_zdr_off_if_no_zdr_endpoint_available: true' in the config to "
+            "turn it off only for the models without a ZDR endpoint."
+        )
+    return missing
+
+
+def cost_estimate_path(config: dict, model: str) -> str:
+    """Returns the estimate file of a benchmark and model, or None if the estimates are not kept in files."""
+    directory = config.get('cost_estimate', {}).get('dir', 'cost_estimates')
+    if not directory:
+        return None
+    name = f"{os.path.splitext(config['benchmark_file'])[0]}__{model}"
+    return os.path.join(directory, re.sub(r'[^\w.-]+', '_', name) + ".json")
+
+
+def estimate_cost(config: dict, items: list, no_zdr_models: set) -> Tuple[float, bool]:
+    """Extrapolates the cost and time of the full run from one item per (model, modality). Returns (total cost, complete).
+
+    Samples saved in the estimate file of the model are reused, only the missing ones are run. The sample results are
+    discarded, and the seed sequence of the full run is left untouched.
+    """
+    by_modality = {}
+    for item in items:
+        by_modality.setdefault(item.get('modality'), []).append(item)
+
+    def context_size(item):
+        path = item['path_to_question_context_file']
+        return os.path.getsize(path) if os.path.exists(path) else 0
+
+    # A sample reused under other settings can be far off, e.g. a text-only sample for a full run
+    settings = {key: config.get(key) for key in ('prompt_caching', 'text_only_baseline', 'white_noise_baseline')}
+    force_rerun = config.get('cost_estimate', {}).get('force_rerun_estimate', False)
+
+    print("\n--- Cost Estimate ---")
+    rows = []
+    total = 0.0
+    total_time = 0.0
+    complete = True
+    time_complete = True
+
+    def duration(seconds):
+        return str(datetime.timedelta(seconds=round(seconds)))
+
+    for model in config['models']:
+        path = cost_estimate_path(config, model)
+        samples = {}
+        if path and os.path.exists(path) and not force_rerun:
+            with open(path, encoding='utf-8') as f:
+                samples = json.load(f)['samples']
+
+        modality_estimates = {}
+        for modality, group in by_modality.items():
+            saved = samples.get(modality)
+            if saved:
+                print(f"\nReusing saved sample from {saved['date']} for model {model} | Modality: {modality} | {path}")
+                if saved['settings'] != settings:
+                    print(f"Warning: the saved sample used other settings: {saved['settings']}, now: {settings}. "
+                          "Use --force_rerun_estimate to replace it.")
+                cost = saved['cost']
+                time_taken = saved.get('time_taken') # Missing in the files saved before time was estimated
+            else:
+                # Median context size, as the size of the context file drives the prompt cost
+                sample = sorted(group, key=context_size)[len(group) // 2]
+                print(f"\nSample for model {model} | Modality: {modality} | Item ID: {sample.get('item_id')}")
+                payload, final_prompt, _ = build_item_request(config, model, sample, config.get('seed'), no_zdr_models)
+                cost, time_taken, full_json, _ = ask_model(config, payload, final_prompt, config['dry_run'])
+                if full_json.get('usage', {}).get('cost') is None:
+                    rows.append((model, modality, len(group), "no cost reported", "-", "-", "-"))
+                    continue
+                samples[modality] = {"item_id": sample.get('item_id'), "context_file": sample['path_to_question_context_file'],
+                                     "cost": cost, "time_taken": time_taken, "usage": full_json['usage'], "settings": settings,
+                                     "date": datetime.datetime.now().isoformat(timespec='seconds')}
+
+            total += cost * len(group)
+            modality_estimates[modality] = {"items": len(group), "sample_cost": cost, "estimated_cost": cost * len(group)}
+            if time_taken is None:
+                time_complete = False
+                time_columns = ("-", "-")
+            else:
+                total_time += time_taken * len(group)
+                time_columns = (f"{time_taken:.1f}s", duration(time_taken * len(group)))
+                modality_estimates[modality].update({"sample_time_seconds": time_taken, "estimated_time_seconds": time_taken * len(group)})
+            rows.append((model, modality, len(group), f"${cost:.6f}", f"${cost * len(group):.4f}", *time_columns))
+
+        model_complete = len(modality_estimates) == len(by_modality)
+        complete = complete and model_complete
+        if path:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump({"benchmark_file": config['benchmark_file'], "model": model, "samples": samples, "estimate": {
+                    "modalities": modality_estimates,
+                    "items": sum(row["items"] for row in modality_estimates.values()),
+                    "cost": sum(row["estimated_cost"] for row in modality_estimates.values()),
+                    "time_seconds": sum(row.get("estimated_time_seconds", 0) for row in modality_estimates.values()),
+                    "complete": model_complete,
+                }}, f, indent=2)
+            print(f"Saved the cost estimate to {path}")
+
+    print(f"\n{'Model':<45} {'Modality':<10} {'Items':>6} {'Sample cost':>17} {'Estimate':>12} {'Sample time':>12} {'Time':>10}")
+    for model, modality, count, sample_cost, estimate, sample_time, time_estimate in rows:
+        print(f"{model:<45} {modality:<10} {count:>6} {sample_cost:>17} {estimate:>12} {sample_time:>12} {time_estimate:>10}")
+    print(f"\nEstimated total cost: ${total:.4f}" + ("" if complete else " (lower bound, some samples reported no cost)"))
+    print(f"Estimated total time: {duration(total_time)}" + ("" if complete and time_complete else
+          " (lower bound, some samples have no time, use --force_rerun_estimate to measure them)"))
+    print("Response lengths vary, and samples are not representative of cache hits in the full run. "
+          "Times are from single requests, so they include any retries of the sample and vary with provider load.")
+    return total, complete
+
+
+def wait_for_approval(timeout: float, on_timeout: str):
+    """Waits for Enter. On timeout, or at once if stdin is closed (e.g. in sbatch), stops or continues as configured."""
+    deadline = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
+    print(f"Press Enter to start the full run, Ctrl+C to abort. With no approval by {deadline:%H:%M:%S} ({timeout}s), "
+          f"the on_timeout action applies: {on_timeout}.", flush=True)
+
+    ready, _, _ = select.select([sys.stdin], [], [], timeout)
+    if ready and sys.stdin.readline():
+        return
+    if on_timeout == "continue":
+        print("No approval received, continuing as configured.")
+        return
+    sys.exit("No approval received, stopping the run. No full run was started.")
 
 
 def sanitize_payload_for_logging(payload: dict) -> dict:
@@ -347,8 +624,14 @@ def main():
     parser.add_argument("--dry_run", default=False, action="store_true", 
                         help="Dry run: do not send anything to LLMs")
     
+    parser.add_argument("--cost_estimate", default=False, action="store_true",
+                        help="Before the full run, run one item per modality and model, print the estimated cost and wait for approval (overrides config).")
+
+    parser.add_argument("--force_rerun_estimate", default=False, action="store_true",
+                        help="With the cost estimate on, rerun the samples even if an estimate file exists (overrides config).")
+
     parser.add_argument("--disable_zdr", default=False, action="store_true",
-                        help="Disable ZDR in the payload, to allow running other audio models that do not support ZDR.")
+                        help="Disable ZDR in the payload, to allow running other audio models that do not support ZDR (overrides config).")
 
 
     cmdline_args = parser.parse_args()
@@ -383,10 +666,12 @@ def main():
     if cmdline_args.max_waiting_time_per_request:
         config['max_waiting_time_per_request'] = cmdline_args.max_waiting_time_per_request
 
-    if cmdline_args.disable_zdr:
-        config['zdr'] = False
-    else:
-        config['zdr'] = True
+    config['zdr'] = config.get('zdr', True) and not cmdline_args.disable_zdr
+
+    if cmdline_args.cost_estimate:
+        config.setdefault('cost_estimate', {})['enabled'] = True
+    if cmdline_args.force_rerun_estimate:
+        config.setdefault('cost_estimate', {})['force_rerun_estimate'] = True
 
     if cmdline_args.run_id:
         benchmark_run_uuid = cmdline_args.run_id
@@ -399,6 +684,7 @@ def main():
     config['rng'] = rng
 
     logdir = set_logdir(config)
+    config['api_error_log'] = os.path.join(logdir, "api_errors.log")
     
     # ---------------------------------------------------------------------------------
     # Generate Run-Specific Lists / Tabs into Google Sheets
@@ -471,6 +757,16 @@ def main():
     total_runs = len(items) * len(config['models'])
     print(f"Total question/model loops to perform: {total_runs}\n")
 
+    no_zdr_models = check_zdr_endpoints(config, resolve_concrete_models(config, items))
+
+    cost_estimate = config.get('cost_estimate', {})
+    if cost_estimate.get('enabled', False):
+        if config['dry_run']:
+            print("Dry run: skipping the cost estimate.")
+        else:
+            estimate_cost(config, items, no_zdr_models)
+            wait_for_approval(cost_estimate.get('approval_timeout_seconds', 120), cost_estimate.get('on_timeout', 'stop'))
+
     # Prepare the log TSV headers
     log_headers = headers + [
         "benchmark_run_uuid", "datetime", "full_prompt", "parameters" , "model", "full_json_response",
@@ -484,60 +780,11 @@ def main():
 
     all_executed_logs = []
     run_count = 0
-    supported_aggregate_models = config.get("supported_aggregate_models", {})
 
     for model in config['models']:
         for item in items:
             run_count += 1
             print(f"\n[{run_count}/{total_runs}] Running Model: {model} | Item ID: {item.get('item_id')}")
-
-            # Prepare User Prompt
-            options = json.loads(item['labeled_final_options'])
-            labels = json.loads(item['all_choices'])
-            options_text = "\n".join(options)
-
-            fmt_info = config['musical_piece_format_info']
-            modality = item.get('modality')
-            submodality = item.get('submodality')
-            format_desc = fmt_info.get(modality, {}).get(submodality, "a musical excerpt")
-
-            print(f"Modality: {modality:>10} | Submodality: {submodality:>19} | Question: {item['question']}")
-            print(f"Options: " + ", ".join(options))
-
-            prompt = config['user_prompt_template']
-            prompt = prompt.replace("<FORMAT>", format_desc)
-            prompt = prompt.replace("<QUESTION>", item['question'])
-            prompt = prompt.replace("<OPTIONS_TEXT>", options_text)
-            prompt = prompt.replace("<OPTION_LABELS>", ', '.join(labels))
-
-            # Build Payload
-            content_file = item['path_to_question_context_file']
-            text_only_baseline = config.get('text_only_baseline', False)
-
-            white_noise_baseline = config.get('white_noise_baseline', False)
-            if text_only_baseline and white_noise_baseline:
-                raise ValueError("Both text_only_baseline and white_noise_baseline cannot be true at the same time. Please choose one baseline or neither.")
-
-            if white_noise_baseline:
-                print("White noise baseline is enabled. Replacing content file with white noise.")
-                if submodality == "audio.mastermix.wav":
-                    content_file = "data/white_noise/audio.mastermix.wav"
-                elif submodality == "visual.short.png":
-                    content_file = "data/white_noise/visual.short.png"
-                elif submodality == "symbolic.musicxml":
-                    content_file = "data/white_noise/symbolic.musicxml"
-                elif submodality == "symbolic.abc.txt":
-                    content_file = "data/white_noise/symbolic.abc.txt"
-                else:
-                    raise ValueError(f"No white noise file available for submodality {submodality}. Please check the config or provide a white noise file for this submodality.")
-
-            if model in supported_aggregate_models:
-                print(f"Model {model} is an aggregate model. Using supported aggregate model {supported_aggregate_models[model]} for payload preparation.")
-                model_name = supported_aggregate_models[model][modality]
-            else:
-                model_name = model
-
-            print(f"Running model: #{model_name}#")
 
             if config.get('seed', None) is None:
                 print("Warning: No seed provided for inference. The inference will be completely non-deterministic.")
@@ -546,17 +793,7 @@ def main():
                 current_seed_for_inference = config['rng'].integers(0, 1e9)
                 print(f"Using seed {current_seed_for_inference} for inference.")
 
-            payload, final_prompt = prepare_llm_payload(
-                model=model_name, 
-                user_prompt=prompt, 
-                system_prompt=config['system_prompt'], 
-                content_file=content_file, 
-                modality=modality, 
-                submodality=submodality,
-                no_content_file=text_only_baseline,
-                zdr=config.get('zdr', True),
-                inference_seed=current_seed_for_inference
-            )
+            payload, final_prompt, content_file = build_item_request(config, model, item, current_seed_for_inference, no_zdr_models)
 
             # Execute Request
             cost, time_taken, full_json, resp_text = ask_model(config, payload, final_prompt, config['dry_run'])
@@ -578,6 +815,8 @@ def main():
             is_correct = (extracted_answer == correct_label) if extracted_answer else "EXTRACTION FAILED"
 
             # Logging Logic
+            text_only_baseline = config.get('text_only_baseline', False)
+            white_noise_baseline = config.get('white_noise_baseline', False)
             log_row = item.copy()
             model_str = "text-only-" + model if text_only_baseline else ("white-noise-" + model if white_noise_baseline else model)
             log_row.update({
@@ -588,7 +827,7 @@ def main():
                 "model": model_str,
                 "full_json_response": json.dumps(full_json),
                 "extracted_response": resp_text,
-                "config_info": json.dumps({"text-only-baseline": text_only_baseline, "dry_run": config['dry_run'], "url": config['url'], "seed": config['seed'], "white-noise-baseline": white_noise_baseline, "content_file_used": content_file}),                
+                "config_info": json.dumps({"text-only-baseline": text_only_baseline, "dry_run": config['dry_run'], "url": config['url'], "seed": config['seed'], "white-noise-baseline": white_noise_baseline, "content_file_used": content_file, "prompt_caching": config.get('prompt_caching')}),                
                 "label_of_answer": extracted_answer,
                 "price": cost,
                 "time_taken": time_taken,
@@ -612,7 +851,10 @@ def main():
                 config["force_header_print"] = False
 
             # 3. Print concise log
-            print(f"  -> Extracted: {extracted_answer} | Expected: {correct_label} | Correct: {is_correct} | Time: {time_taken:.2f}s | Cost: ${cost:.6f}")
+            prompt_tokens_details = full_json.get('usage', {}).get('prompt_tokens_details') or {}
+            cached_tokens, cache_write_tokens = prompt_tokens_details.get('cached_tokens'), prompt_tokens_details.get('cache_write_tokens')
+            cache_info = f" | Cache read/write tokens: {cached_tokens or 0}/{cache_write_tokens or 0}" if cached_tokens or cache_write_tokens else ""
+            print(f"  -> Extracted: {extracted_answer} | Expected: {correct_label} | Correct: {is_correct} | Time: {time_taken:.2f}s | Cost: ${cost:.6f}{cache_info}")
 
     # =====================================================================
     # Trigger final evaluation logic
