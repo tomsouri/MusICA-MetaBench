@@ -21,8 +21,8 @@ dataset's license. There are two source datasets, with two different licenses, s
 
 ## Naming convention
 
-ChoralSynth-derived instances are prefixed with `choralsynth` (the ChoralSynth
-source pieces themselves live on the `dataset-choralsynth` branch). Every other
+ChoralSynth-derived instances are prefixed with `choralsynth` (the list of
+ChoralSynth pieces is `pieces-choral-synth.tsv`). Every other
 instance in this directory is derived from ChoraleBricks. If you generate new
 instances, the result inherits the license of whichever source dataset it was
 built from.

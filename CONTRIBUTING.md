@@ -362,8 +362,9 @@ These are all things that have actually gone wrong, and all worth checking on a 
 
 ### What adapting to a second dataset actually took
 
-ChoralSynth is the one worked precedent, and it is honest to say what it cost. The work lives on
-the `dataset-choralsynth` branch (**not merged into `main`**) and included:
+ChoralSynth is the one worked precedent, and it is honest to say what it cost. The work is merged
+into `main` (with ChoralSynth-specific behaviour in
+`benchmark-generation-config-choral-synth.yaml`) and included:
 
 - addressing voices **by number** instead of the hard-coded `S`/`A`/`T`/`B` mapping;
 - extracting part names from the score, behind a `use_xml_part_names` setting;
