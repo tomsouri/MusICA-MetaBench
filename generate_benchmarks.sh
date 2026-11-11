@@ -17,7 +17,7 @@
 #       --seeds 55 56 57 \
 #       [--submodalities "audio.mastermix.wav" "symbolic.abc.txt" "visual.short.png"] \
 #       [--allowed_metaq_ids 1 2 3 4 5 6 7 8 9] \
-#       [--config benchmark-generation-config.yaml]
+#       [--config benchmark-generation-config-chorale-bricks.yaml]
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ declare -a sizes=()
 declare -a seeds=()
 declare -a submodalities=("audio.mastermix.wav" "symbolic.abc.txt" "visual.short.png")
 declare -a allowed_metaq_ids=(1 2 3 4 5 6 7 8 9 10 11)
-config="benchmark-generation-config.yaml"
+config="benchmark-generation-config-chorale-bricks.yaml"
 path_to_pregenerated_full_benchmark="benchmarks/pre-generated_full_benchmark.tsv"
 
 

@@ -1,0 +1,75 @@
+# Copyright (C) 2026  Tomáš Sourada, Katia Vendrame, Jan Hajič, jr.
+#
+# This file is part of the MusICA MetaBench source code, licensed under
+# the GNU General Public License v3.0 or later (SPDX: GPL-3.0-or-later).
+# See the LICENSE-SOURCE-CODE file in the repository root for the full
+# license text, or <https://www.gnu.org/licenses/>.
+
+# Step 0: Benchmark Configuration
+
+# How to sort distractors:
+# simplification for draft: use random distractors, do not employ RUListening methodology (to be applied after Mar 30)
+sorting_method: "dummy_shuffle"
+sorting_methods_path: "src/distractor_sorting.py" # Add this to specify the python file with sorting methods
+
+# simplification, use 5 always (including NOTA)
+num_options: 5
+nota_text: "none of the other options is correct"
+add_nota: true
+
+questions_per_subcategory_count: 20 # number of questions to generate per subcategory (for the draft, we can keep it small, e.g. 10, and then scale up after analyzing the results and iterating on the question templates)
+
+ontology_path: "ontology.yaml" # Add this to specify the path to the ontology file
+
+# If you specify a number here, the total number of 
+# max_benchmark_items: 
+
+# simplification for draft: only use final mix recordings, high-quality rendered PDF, and musicxml
+submodalities:
+  - "audio.mastermix.wav"
+  - "visual.short.png"
+  - "symbolic.abc.txt"
+
+# simplification: for the draft, pre-decided percentage of such questions (those that do not contain ground truth among the options), e.g. 20% if we use 5 options (then NOTA is correct as frequently as any other option), only focus on it on evaluation (discussion of results)
+nota_correct_percentage: 0.20 # e.g., 20%
+labels: ["A", "B", "C", "D", "E"]
+seed: 52
+min_num_distractors: 4
+distractor_pool_size: 5 # number of distractors to sample from the ontology for each question (before sorting and selecting the final options)
+random_distractors: false # whether to sample distractors randomly from the ontology (instead of using piece specific distractors)
+cmdline_args:
+  meta: "meta-questions.tsv"
+  pieces: "pieces-chorale-bricks.tsv"
+  methods_path: "src/ground_truth_and_distractor_pool_extractions.py"
+  output: "benchmark_v1.tsv"
+
+allowed_metaq_ids:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+
+verbose: true
+use_all_inds: true # whether to use all indices for target_index (instead of just 1, 2, 3, end)
+max_target_index: 20 # Number of indices to generate for replacement of <index> wildcard in question templates (in questions like "what is the 29th note in soprano?") if use_all_inds is True, this is the maximum number of indices to generate 
+music_ontology_settings:
+  ontology_path: "ontology.yaml"
+  harmonic_system: "tonal"
+  include_enharmonic_tonalities: false # add enharmonic spellings (e.g. G- major next to F# major) to the tonality ontology
+  cadences_path: "selected_cadences.yaml" # cadence ontology file
+  dominant_tonality_distractor: true # use the dominant pitch name as a distractor in tonality questions
+  include_tuplets: false # add tuplet rhythms (duplet, quintuplet, ...) to the rhythm ontology
+  use_xml_part_names: false # use the voices defined in the ontology (see benchmark-generation-config-choral-synth.yaml for the alternative)
+
+balance_meta_questions_perfectly: false # whether the per-meta-question counts should be perfectly balanced in the per-subcategory count in the final subsampled benchmark
+allow_meta_question_backoff: true # If set to True, enables the redistribution of missing items to other meta-questions: useful in cases when some meta-questions have a limited number of possible questions and the desired number of questions per subcategory is high.
+
+# remove a certain percentage of items with ground truth 0 (e.g. if the question is "How many times does the interval Perfect Fifth appear?" and the piece does not contain any Perfect Fifth, then the ground truth is 0, and we might want to remove a percentage of such questions from the benchmark, e.g. 80%, to make the benchmark more challenging and less skewed towards questions with ground truth 0)
+percentage_gt_zero_to_remove: 0.9

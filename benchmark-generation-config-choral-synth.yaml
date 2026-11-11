@@ -19,7 +19,7 @@ add_nota: true
 
 questions_per_subcategory_count: 20 # number of questions to generate per subcategory (for the draft, we can keep it small, e.g. 10, and then scale up after analyzing the results and iterating on the question templates)
 
-ontology_path: "ontology.yaml" # Add this to specify the path to the ontology file
+ontology_path: "ontology-choral-synth.yaml" # Add this to specify the path to the ontology file
 
 # If you specify a number here, the total number of 
 # max_benchmark_items: 
@@ -39,7 +39,7 @@ distractor_pool_size: 5 # number of distractors to sample from the ontology for 
 random_distractors: false # whether to sample distractors randomly from the ontology (instead of using piece specific distractors)
 cmdline_args:
   meta: "meta-questions.tsv"
-  pieces: "pieces.tsv"
+  pieces: "pieces-choral-synth.tsv"
   methods_path: "src/ground_truth_and_distractor_pool_extractions.py"
   output: "benchmark_v1.tsv"
 
@@ -60,8 +60,13 @@ verbose: true
 use_all_inds: true # whether to use all indices for target_index (instead of just 1, 2, 3, end)
 max_target_index: 20 # Number of indices to generate for replacement of <index> wildcard in question templates (in questions like "what is the 29th note in soprano?") if use_all_inds is True, this is the maximum number of indices to generate 
 music_ontology_settings:
-  ontology_path: "ontology.yaml"
+  ontology_path: "ontology-choral-synth.yaml"
   harmonic_system: "tonal"
+  include_enharmonic_tonalities: true # add enharmonic spellings (e.g. G- major next to F# major) to the tonality ontology; default false
+  cadences_path: "selected_cadences-choral-synth.yaml" # cadence ontology file; default selected_cadences.yaml
+  dominant_tonality_distractor: false # use the dominant pitch name as a distractor in tonality questions; default true
+  include_tuplets: true # add tuplet rhythms (duplet, quintuplet, ...) to the rhythm ontology; default false
+  use_xml_part_names: true # use the MusicXML partName of every part as the voice name in questions (needed for datasets with varying voices, e.g. choral-synth); default false uses the voices from the ontology
 
 balance_meta_questions_perfectly: false # whether the per-meta-question counts should be perfectly balanced in the per-subcategory count in the final subsampled benchmark
 allow_meta_question_backoff: true # If set to True, enables the redistribution of missing items to other meta-questions: useful in cases when some meta-questions have a limited number of possible questions and the desired number of questions per subcategory is high.

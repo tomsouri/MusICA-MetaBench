@@ -81,7 +81,7 @@ correct* as the correct answer, to probe over-confidence.
 
 The `target_index` wildcard has only four values in [ontology.yaml](ontology.yaml) — `first`,
 `second`, `third`, `last`. With `use_all_inds: true` (the default in
-[benchmark-generation-config.yaml](benchmark-generation-config.yaml)) it is replaced by a
+[benchmark-generation-config-chorale-bricks.yaml](benchmark-generation-config-chorale-bricks.yaml)) it is replaced by a
 `VirtualIndexList` that produces ordinals up to `max_target_index` on demand, and extractors pick
 an index themselves:
 
@@ -152,7 +152,7 @@ Generate a tiny benchmark restricted to your template alone:
 
 ```bash
 .venv/bin/python generate_benchmark.py \
-    --config benchmark-generation-config.yaml \
+    --config benchmark-generation-config-chorale-bricks.yaml \
     --benchmark_file /tmp/smoke.tsv \
     --allowed_metaq_ids 12 \
     --questions_per_subcategory_count 2
@@ -317,15 +317,16 @@ data/<dataset>/<piece_id>/
     symbolic.abc.txt        # symbolic submodality as presented to the model
 ```
 
-The three non-MusicXML filenames are the **submodality names** configured in
-[benchmark-generation-config.yaml](benchmark-generation-config.yaml); the convention is
+The three non-MusicXML filenames are the **submodality names** configured in the
+generation config (e.g. [benchmark-generation-config-chorale-bricks.yaml](benchmark-generation-config-chorale-bricks.yaml)); the convention is
 `<modality><anything>.<extension>`. Then run
 
 ```bash
-bash generate_pieces_list.sh
+bash generate_pieces_list.sh <dataset>
 ```
 
-to regenerate [pieces.tsv](pieces.tsv), which the generator reads.
+to regenerate `pieces-<dataset>.tsv` (e.g. [pieces-chorale-bricks.tsv](pieces-chorale-bricks.tsv)), which the generator reads.
+For a new dataset, also add a `benchmark-generation-config-<dataset>.yaml` whose `cmdline_args.pieces` points to it.
 
 ### Synthesising the modalities you do not have
 
@@ -361,8 +362,9 @@ These are all things that have actually gone wrong, and all worth checking on a 
 
 ### What adapting to a second dataset actually took
 
-ChoralSynth is the one worked precedent, and it is honest to say what it cost. The work lives on
-the `dataset-choralsynth` branch (**not merged into `main`**) and included:
+ChoralSynth is the one worked precedent, and it is honest to say what it cost. The work is merged
+into `main` (with ChoralSynth-specific behaviour in
+`benchmark-generation-config-choral-synth.yaml`) and included:
 
 - addressing voices **by number** instead of the hard-coded `S`/`A`/`T`/`B` mapping;
 - extracting part names from the score, behind a `use_xml_part_names` setting;
@@ -386,8 +388,8 @@ To compare, say, rendered vs. scanned vs. handwritten score images, or to add MI
    or `PDF`, and symbolic formats must be textual — MIDI has to be converted to something like CSV
    before it can be fed to a model. Submodality names must follow
    `<modality><anything>.<extension>`.
-2. Add the submodality to `submodalities` in
-   [benchmark-generation-config.yaml](benchmark-generation-config.yaml) so the generator emits
+2. Add the submodality to `submodalities` in the generation configs
+   (`benchmark-generation-config-*.yaml`) so the generator emits
    items for it.
 
 ---

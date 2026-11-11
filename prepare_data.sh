@@ -339,11 +339,11 @@ for dir in */; do
 done
 
 
-# Generate the list of pieces file (pieces.tsv)
+# Generate the list of pieces file (pieces-chorale-bricks.tsv)
 # (required for the benchmark generation step)
 cd $ROOT_DIR
-bash generate_pieces_list.sh
-log "List of pieces written to pieces.tsv"
+bash generate_pieces_list.sh chorale-bricks
+log "List of pieces written to pieces-chorale-bricks.tsv"
 
 log "Data preparation complete."
 

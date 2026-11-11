@@ -72,7 +72,7 @@ for seed in "${seeds[@]}"; do
 
     # echo "Generating a benchmark with random seed: $seed"
 
-    # run .venv/bin/python3 generate_benchmark.py --config benchmark-generation-config.yaml \
+    # run .venv/bin/python3 generate_benchmark.py --config benchmark-generation-config-chorale-bricks.yaml \
     #     --benchmark_file "$benchmark_file" \
     #     --questions_per_subcategory_count "$qpersubcategory" \
     #     --seed "$seed" \

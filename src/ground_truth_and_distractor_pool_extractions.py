@@ -18,6 +18,8 @@ from operator import index
 
 from music21 import converter, note, chord, stream, interval, pitch, meter,key,roman,duration
 import os
+
+import music21
 from utils import get_musicxml_file_path
 import yaml
 import itertools
@@ -75,7 +77,7 @@ def get_tonal_notes():
     
     return notes
 
-def get_rhythm():
+def get_rhythm(include_tuplets=False):
     # We iterate through the official music21 duration types
     # to map their standard quarterLength to their name.
     rhythm_dict = {}
@@ -87,6 +89,22 @@ def get_rhythm():
             # Add single-dotted variant (quarter length * 1.5)
             dotted_ql = quarter_length * 1.5
             rhythm_dict[str(dotted_ql)] = f"dotted-{duration_type}"
+
+    if not include_tuplets:
+        return rhythm_dict
+
+    # Add tuplets (common ratios)
+    tuplet_names = {
+        "2/3": "triplet",
+        "3/2": "duplet",
+        "4/3": "quadruplet",
+        "5/4": "quintuplet",
+        "6/4": "sextuplet",
+        "7/4": "septuplet",
+        "8/7": "octuplet",
+    }
+    for ratio, name in tuplet_names.items():
+        rhythm_dict[ratio] = name
 
     return rhythm_dict
 
@@ -105,16 +123,32 @@ def get_time_signatures():
     ontology = {ts: ts for ts in common_time_signatures}
     return ontology
 
-def get_tonality():
+def get_tonality(include_enharmonics=False):
     modes = ['major', 'minor']  #, 'dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian']
     ontology = {}
     for pc in range(12):
         p = pitch.Pitch()
         p.pitchClass = pc
-        for mode in modes:
-            word = f"{p.name} {mode}"
-            ontology[word] = word
-        ontology[p.name] = p.name # also include the pitch class name alone as a potential answer (e.g., for questions about key signatures without mode specified)
+
+        if not include_enharmonics:
+            for mode in modes:
+                word = f"{p.name} {mode}"
+                ontology[word] = word
+            ontology[p.name] = p.name # also include the pitch class name alone as a potential answer (e.g., for questions about key signatures without mode specified)
+            continue
+        
+        # Get both the primary name and its enharmonic equivalent
+        pitch_names = {p.name}
+        enharmonic = p.getEnharmonic()
+        if enharmonic and enharmonic.name != p.name:
+            pitch_names.add(enharmonic.name)
+        
+        # Add both tonality and mode combinations for all enharmonic spellings
+        for pitch_name in pitch_names:
+            for mode in modes:
+                word = f"{pitch_name} {mode}"
+                ontology[word] = word
+    
     return ontology
 
 def get_ordinal_suffix(n: int) -> str:
@@ -202,21 +236,23 @@ def get_chords():
     return ontology
 
 
-def get_cadence_types():
+def get_cadence_types(ontology_path="selected_cadences.yaml"):
     """
-    Generates a dictionary of cadence types using a manually sampled list of 
-    the most frequent Roman numeral combinations (20-50).
-    If a YAML file with the ontology exists, it loads it. Otherwise, it builds the ontology and saves it.
+    Loads or builds cadence types ontology.
+    - If ontology_path (default selected_cadences.yaml) exists, loads it
+    - Otherwise builds the base list, adds defaults, and saves to file
+    - Always ensures the file is saved for persistence
     """
-    ontology_path = "selected_cadences.yaml"
-
+    # Try to load existing file
     if os.path.exists(ontology_path):
         with open(ontology_path, 'r') as file:
             print(f"Loading cadence types ontology from {ontology_path}")
-            return yaml.load(file, Loader=yaml.FullLoader)
+            ontology = yaml.load(file, Loader=yaml.FullLoader)
+            if ontology:
+                return ontology
 
+    # Build base cadences if file doesn't exist or is empty
     print(f"Building cadence types ontology...")
-    # Manually sampled frequent Roman numeral combinations (approx 45 samples)
     selected_list = [
         "V - I", "V7 - I", "v - i", "V - i", "V7 - i", 
         "vii - I", "vii7 - I", "vii - i", "vii7 - i",
@@ -240,6 +276,7 @@ def get_cadence_types():
     selected_list = list(selected_list)
     ontology = {cad: cad for cad in selected_list}
     
+    # Save the base ontology to file for future use
     with open(ontology_path, 'w') as file:
         yaml.dump(ontology, file)
         print(f"Cadence types ontology saved to {ontology_path}")
@@ -340,12 +377,17 @@ class AnswerDistractorExtractors:
         else:
             self.dict_rhythm_prop_ontology = self.build_rhythm_prop_ontology(system)
             self.ontology['rhythm_proportion'] = [{k:v} for k,v in self.dict_rhythm_prop_ontology.items()]
-        self.voice_mapping = {
-                    'S': 0, # Soprano
-                    'A': 1, # Alto
-                    'T': 2, # Tenor
-                    'B': 3  # Bass
-                }
+
+        self.use_xml_part_names = music_config.get('use_xml_part_names', False)
+        if "voice" in self.ontology.keys() and not(self.use_xml_part_names):
+            self.voice_mapping = {}
+            idx = 0
+            temp_dict = {k: v for d in self.ontology['voice'] for k, v in d.items()}
+            for short_name, full_name in temp_dict.items():
+                self.voice_mapping[short_name] = idx
+                idx +=1
+            self.use_xml_part_names = False
+            
         if "cadences" in self.ontology.keys():
             self.dict_cadence_ontology = {k: v for d in self.ontology['cadences'] for k, v in d.items()}
         #  TODO: TO SOLVE / very slow
@@ -408,7 +450,7 @@ class AnswerDistractorExtractors:
     def build_cadence_ontology(self, system):
         if system=="tonal":
             
-            return get_cadence_types()
+            return get_cadence_types(self.config['music_ontology_settings'].get('cadences_path', 'selected_cadences.yaml'))
                 # "V-I": "authentic cadence",
                 # "V-vi": "deceptive cadence",
                 # "IV-I": "plagal cadence",
@@ -435,13 +477,13 @@ class AnswerDistractorExtractors:
 
     def build_tonality_ontology(self, system):
         if system=="tonal":
-            return get_tonality()
+            return get_tonality(self.config['music_ontology_settings'].get('include_enharmonic_tonalities', False))
         else:
             raise ValueError(f"Unknown hamonic system for harmonical recognition: {system}")
         
     def build_rhythm_ontology(self, system):
         if system=="tonal":
-            return get_rhythm()
+            return get_rhythm(self.config['music_ontology_settings'].get('include_tuplets', False))
 
         else:
             raise ValueError(f"Unknown hamonic system for harmonical recognition: {system}")
@@ -465,14 +507,63 @@ class AnswerDistractorExtractors:
 
         else:
             raise ValueError(f"Unknown hamonic system for harmonical recognition: {system}")
-    def get_nth_note(self,path: str, values: dict) -> str:
+    def get_part_and_notes(self, score, values, rests=False):
+        if self.use_xml_part_names:
+            score_voices = {str(i):score.parts[i].partName for i in range(len(score.parts))}
+            tried_voices = []
+            notes = []
+            while not notes:
+                chosen_voice = self.rng.choice(list(score_voices.keys()))
+                tried_voices.append(chosen_voice)
+                part_index = int(chosen_voice)
+                voice_key = score_voices[chosen_voice]
+                values['voice'] = voice_key
+                target_part = score.parts[part_index]
+                # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
+                if rests:
+                    check_chords = list(target_part.flatten().getElementsByClass(music21.chord.Chord))
+                    if check_chords:
+                        notes = []
+                    else:
+                        notes = list(target_part.flatten().notesAndRests)
+                else:
+                    check_chords = list(target_part.flatten().getElementsByClass(music21.chord.Chord))
+                    if check_chords:
+                        notes = []
+                    else:    
+                        notes = list(target_part.flatten().getElementsByClass(note.Note))
+                
+                if not notes and len(set(tried_voices)) == len(score_voices):
+                    if self.verbose:
+                        print(f"Warning: No valid notes found in any part of the score. Skipping datapoint.")
+                    return None, values
+            
+        else: # default, for same n-voices setup on all data, defined in ontology['voice']
+            voice_key = values.get('voice')
+            if voice_key not in self.voice_mapping:
+                raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of {self.ontology['voice']}.")
+            part_index = self.voice_mapping[voice_key]
+            # Check if the score has the expected number of parts
+            if part_index >= len(score.parts):
+                raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
+            target_part = score.parts[part_index]
+            # Flatten the part (to remove measure hierarchies) and extract the notes (and rests, if requested)
+            if rests:
+                notes = list(target_part.flatten().notesAndRests)
+            else:
+                notes = list(target_part.flatten().getElementsByClass(note.Note))
+            if not notes:
+                raise ValueError(f"No valid notes found in part '{voice_key}' for the score '{score}'.")  
+        return notes, values
+    
+    def get_nth_note(self, path: str, question_values: dict) -> str:
         """
         Logic: Parses a MusicXML file and returns the scientific pitch notation 
         of the index-th note in the specified voice part.
         
         Args:
             path (str): The path to the directory of the piece, which contains the MusicXML file.
-            values (dict): A dictionary containing the value for {index} and {voice}, e.g., {"target_index": 1, "voice": "S"}
+            values (dict): A dictionary containing the value for {index} and {voice}, e.g., {"target_index": 1, "voice": "Soprano"}
             
         Returns:
             str: return NOTE NAME ONLY (e.g., "G", "E flat").
@@ -485,30 +576,13 @@ class AnswerDistractorExtractors:
         
         # Parse the MusicXML file into a music21 Stream
         score = converter.parse(musicxml_path)
-               
-        voice_key = values.get('voice')
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-            
-        part_index = self.voice_mapping[voice_key]
-        
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-            
-        target_part = score.parts[part_index]
-        
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().getElementsByClass(note.Note))
-        
-        if not notes:
-            raise ValueError(f"No valid notes found in part '{voice_key}'.")
+        notes, question_values = self.get_part_and_notes(score, question_values)     
             
         if self.use_all_inds:
             note_index = int(self.rng.choice(range(len(notes)-1)))
-            values['target_index'] = str(note_index) #self.ontology["target_index"][int(note_index)]
+            question_values['target_index'] = str(note_index) #self.ontology["target_index"][int(note_index)]
         else:
-            note_index = values.get('target_index')
+            note_index = question_values.get('target_index')
             if note_index == 'end':
                     note_index = -1
             else:
@@ -521,8 +595,8 @@ class AnswerDistractorExtractors:
         
         if not(self.random_distractors):
             # Build a set of candidate distractor notes (exclude the true note)
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 notes += other_notes
             possible_distractors = set([n.name for n in notes if n.name != target_note.name])
@@ -531,7 +605,7 @@ class AnswerDistractorExtractors:
         else:
             distractor_pool = []
         
-        return self.dict_note_ontology[target_note.name], distractor_pool, values
+        return self.dict_note_ontology[target_note.name], distractor_pool, question_values
 
     
     def get_note_quantity(self, path: str, question_values: dict) -> tuple[str, list[str]]:
@@ -562,31 +636,14 @@ class AnswerDistractorExtractors:
         if target_pitch not in self.dict_note_ontology.keys():
             raise ValueError(f"Invalid pitch specified: {target_pitch}. Expected one of {self.dict_note_ontology}.")
 
-        voice_key = question_values.get('voice')
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-            
-        part_index = self.voice_mapping[voice_key]
-        
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-            
-        target_part = score.parts[part_index]
-        
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().getElementsByClass(note.Note))
-        
-        if not notes:
-            raise ValueError(f"No valid notes found in part '{voice_key}'")           
-        
+        notes, question_values = self.get_part_and_notes(score, question_values)
         # Count occurrences of the target pitch in the selected part
         count = int(sum(1 for n in notes if n.name == target_pitch))
 
         if not self.random_distractors:
             all_notes = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 all_notes.append([n.name for n in other_notes])
             possible_values = []
@@ -625,21 +682,7 @@ class AnswerDistractorExtractors:
         # Parse the MusicXML file into a music21 Stream
         score = converter.parse(musicxml_path)
                 
-        voice_key = question_values.get('voice')
-
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-            
-        part_index = self.voice_mapping[voice_key]
-        
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-            
-        target_part = score.parts[part_index]
-        
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().getElementsByClass(note.Note))
+        notes, question_values = self.get_part_and_notes(score, question_values)
 
         if self.use_all_inds:
             note_index = int(self.rng.choice(range(len(notes)-1)))
@@ -662,8 +705,8 @@ class AnswerDistractorExtractors:
         
         if not self.random_distractors:
             all_interval_keys = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx]
@@ -708,24 +751,8 @@ class AnswerDistractorExtractors:
        
         if target_interval not in self.dict_interval_ontology.keys():
             raise ValueError(f"Invalid pitch specified: {target_interval}. Expected one of {self.dict_interval_ontology}.")
-
-        voice_key = question_values.get('voice')
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-        
-        part_index = self.voice_mapping[voice_key]
-        
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-            
-        target_part = score.parts[part_index]
-        
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().getElementsByClass(note.Note))
-        
-        if not notes:
-            raise ValueError(f"No valid notes found in part '{voice_key}'")           
+       
+        notes, question_values = self.get_part_and_notes(score, question_values)          
     
         #for test_note in score.parts[0].flatten().getElementsByClass(note.Note):
         intervals = []
@@ -740,8 +767,8 @@ class AnswerDistractorExtractors:
         
         if not self.random_distractors:
             voice_intervals = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().getElementsByClass(note.Note))
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx]
@@ -762,7 +789,7 @@ class AnswerDistractorExtractors:
 
         return count, distractor_pool, question_values
 
-    def get_nth_rhythm(self, path: str, values: dict) -> str:
+    def get_nth_rhythm(self, path: str, question_values: dict) -> str:
         """
         Logic: Parses a MusicXML file and returns the rhythm (e.g., quarter, eighth) of the index-th note in the specified voice part.
 
@@ -782,28 +809,13 @@ class AnswerDistractorExtractors:
         # Parse the MusicXML file into a music21 Stream
         score = converter.parse(musicxml_path)
 
-        voice_key = values.get('voice')
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-
-        part_index = self.voice_mapping[voice_key]
-
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-
-        target_part = score.parts[part_index]
-
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().notesAndRests)
+        notes, question_values = self.get_part_and_notes(score, question_values, rests = True)
        
-        if not notes:
-            raise ValueError(f"No valid notes found in part '{voice_key}'.")
         if self.use_all_inds:
             note_index = int(self.rng.choice(range(len(notes)-1)))
-            values['target_index'] = str(note_index)
+            question_values['target_index'] = str(note_index)
         else:
-            note_index = values.get('target_index')
+            note_index = question_values.get('target_index')
             
             if note_index == 'end':
                 note_index = -1
@@ -819,21 +831,21 @@ class AnswerDistractorExtractors:
 
         if not self.random_distractors:
             all_notes = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 all_notes += other_notes
             # Build a set of candidate distractor rhythms (exclude the true rhythm)
 
             distractor_pool_set = set(n.quarterLength for n in all_notes)
-            distractor_pool = [self.dict_rhythm_ontology[str(sample)] for sample in distractor_pool_set if str(sample) != target_rhythm]
+            distractor_pool = [self.dict_rhythm_ontology[str(sample)] for sample in distractor_pool_set if str(sample) != target_rhythm and str(sample) in self.dict_rhythm_ontology.keys()]
             # distractor_pool = [{str(n.quarterLength): str(n.type)} for n in set_all_notes if str(n.quarterLength) != target_rhythm]
         else:
             distractor_pool = [] #self.rng.choice(list(self.dict_rhythm_ontology.values()), len(list(self.dict_rhythm_ontology.values())), replace=False).tolist()
             
-        return self.dict_rhythm_ontology[target_rhythm], distractor_pool, values
+        return self.dict_rhythm_ontology[target_rhythm], distractor_pool, question_values
 
-    def get_rhythm_count(self, path: str, values: dict) -> str:
+    def get_rhythm_count(self, path: str, question_values: dict) -> str:
         """
         Logic: Parses a MusicXML file and returns the rhythm (e.g., quarter, eighth) of the index-th note in the specified voice part.
 
@@ -852,30 +864,14 @@ class AnswerDistractorExtractors:
 
         # Parse the MusicXML file into a music21 Stream
         score = converter.parse(musicxml_path)
-
-        voice_key = values.get('voice')
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-
-        part_index = self.voice_mapping[voice_key]
-
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-
-        target_part = score.parts[part_index]
-
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().notesAndRests)
-        if not notes:
-            raise ValueError(f"No valid notes found in part '{voice_key}'.")
+        notes, question_values = self.get_part_and_notes(score, question_values, rests = True)
         
-        count = int(sum(1 for n in notes if str(n.quarterLength) == values.get('rhythm')))
+        count = int(sum(1 for n in notes if str(n.quarterLength) == question_values.get('rhythm')))
     
         if not self.random_distractors:
             all_notes = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 all_notes.append([n.quarterLength for n in other_notes])
             possible_values = []
@@ -889,36 +885,14 @@ class AnswerDistractorExtractors:
         else:
             distractor_pool = [] #self.rng.choice(list(self.dict_rhythm_ontology.values()), len(list(self.dict_rhythm_ontology.values())), replace=False).tolist()
             
-        return count, distractor_pool, values
+        return count, distractor_pool, question_values
 
     def get_rhythm_pattern(self, path: str, question_values: dict) -> tuple[str, list[str]]:
         
         musicxml_path = get_musicxml_file_path(path)
         score = converter.parse(musicxml_path)
-        # # target_rhythm = question_values.get('rhythm')
+        notes, question_values = self.get_part_and_notes(score, question_values, rests = True)
        
-        # if target_rhythm not in self.dict_rhythm_ontology.keys():
-        #     raise ValueError(f"Invalid rhythm specified: {target_rhythm}. Expected one of {self.dict_rhythm_ontology}.")
-        
-        voice_key = question_values.get('voice')
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-        
-        part_index = self.voice_mapping[voice_key]
-        
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-            
-        target_part = score.parts[part_index]
-        
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().notesAndRests)                   
-        if not notes:
-            raise ValueError(f"No valid notes found in part '{voice_key}'")           
-
-        if not os.path.exists(musicxml_path):
-            raise FileNotFoundError(f"Could not find file: {musicxml_path}")
         if self.use_all_inds:
             note_index = int(self.rng.choice(range(len(notes)-1)))
             question_values['target_index'] = str(note_index) #self.ontology['target_index'][note_index]
@@ -955,13 +929,14 @@ class AnswerDistractorExtractors:
                 self.dict_rhythm_prop_ontology[str(round(target_prop,2))] =f"1:{round(target_prop)}"
             else:
                 self.dict_rhythm_prop_ontology[str(round(target_prop,2))] = f"{str(round(1/target_prop))}:1"
+            target_prop_name = self.dict_rhythm_prop_ontology[str(round(target_prop,2))]
             if self.config.get('verbose', False):
                 print(f"Could not match detected rhythm prop '{target_prop}' to any ontology entry. Added pattern {self.dict_rhythm_prop_ontology[str(round(target_prop,2))]} to ontology.")
               
         if not self.random_distractors:
             all_props = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx].quarterLength
@@ -993,35 +968,16 @@ class AnswerDistractorExtractors:
         return target_prop_name, distractor_pool, question_values
     
     def get_rhythm_pattern_count(self, path: str, question_values: dict) -> tuple[str, list[str]]:
-        
         musicxml_path = get_musicxml_file_path(path)
+        if not os.path.exists(musicxml_path):
+            raise FileNotFoundError(f"Could not find file: {musicxml_path}")
         score = converter.parse(musicxml_path)
         # # target_rhythm = question_values.get('rhythm')
        
         # if target_rhythm not in self.dict_rhythm_ontology.keys():
         #     raise ValueError(f"Invalid rhythm specified: {target_rhythm}. Expected one of {self.dict_rhythm_ontology}.")
         
-        voice_key = question_values.get('voice')
-        if voice_key not in self.voice_mapping:
-            raise ValueError(f"Invalid voice specified: {voice_key}. Expected one of 'S', 'A', 'T', 'B'.")
-        
-        part_index = self.voice_mapping[voice_key]
-        
-        # Check if the score has the expected number of parts
-        if part_index >= len(score.parts):
-            raise IndexError(f"The parsed score does not contain a part for voice '{voice_key}'.")
-            
-        target_part = score.parts[part_index]
-        
-        # Flatten the part (to remove measure hierarchies) and extract only the notes (ignoring rests/chords)
-        notes = list(target_part.flatten().notesAndRests)
-        
-        if not notes:
-            raise ValueError(f"No valid notes found in part '{voice_key}'")           
-
-        if not os.path.exists(musicxml_path):
-            raise FileNotFoundError(f"Could not find file: {musicxml_path}")
-        
+        notes, question_values = self.get_part_and_notes(score, question_values, rests = True)
 
         props = []
         for note_idx in range(len(notes)-1):
@@ -1039,8 +995,8 @@ class AnswerDistractorExtractors:
             
         if not self.random_distractors:
             all_props = []
-            for vv in self.voice_mapping.keys():
-                other_part = score.parts[self.voice_mapping[vv]]
+            for idx in range(len(score.parts)):
+                other_part = score.parts[idx]
                 other_notes = list(other_part.flatten().notesAndRests)
                 for note_idx in range(len(other_notes)-1):
                     n1 = other_notes[note_idx].quarterLength
@@ -1106,10 +1062,10 @@ class AnswerDistractorExtractors:
             return None, [], question_values
         
         else:
-
             keys_dict["tonic"]  = key_signatures.name
             #keys_dict["dominant"]  = key.Key(key_signatures.getDominant().name, key_signatures.mode).asKey().name
-            keys_dict["dominant"]  = key_signatures.getDominant().name
+            if self.config['music_ontology_settings'].get('dominant_tonality_distractor', True):
+                keys_dict["dominant"]  = key_signatures.getDominant().name
             keys_dict["relative minor/major"] = key_signatures.relative.name                    
             target_key_signature_name = self.dict_tonality_ontology[keys_dict[harmonic_function]]            
             if not(self.random_distractors):
@@ -1156,7 +1112,10 @@ class AnswerDistractorExtractors:
         else:
             if "with" in target_chord:  # filter out chords with added tones (e.g., "C major with added sixth")
                 target_chord = target_chord.split(" with")[0]
-            target_chord_name = self.dict_chord_ontology[target_chord]
+            if target_chord not in self.dict_chord_ontology.keys():
+                return None, [], question_values
+            else:
+                target_chord_name = self.dict_chord_ontology[target_chord]
             
             if not(self.random_distractors):
                 chords = [chord.commonName for chord in chords]
@@ -1264,8 +1223,6 @@ class AnswerDistractorExtractors:
                 if self.config.get('verbose', False):
                     print(f"Could not match detected cadence '{target_cadence_str}' to any ontology entry. Consider expanding the cadence ontology or check the parsing logic. Added pattern f\"{new_rn1} - {new_rn2}\" to ontology.")
                 
-                with open("selected_cadences.yaml", "w") as f:
-                    yaml.dump(self.dict_cadence_ontology, f)
             
             if not(self.random_distractors):
                 #TODO: very slow to generate all cadences for piece, so for now use just random distractors, because ontology for cadences is quite specific and small.
@@ -1291,17 +1248,30 @@ class AnswerDistractorExtractors:
         # This function can be extended to handle different types of questions by checking the question type and calling the appropriate extraction method.
         # For now, it directly calls get_nth_note as an example.
         
+        musicxml_path = get_musicxml_file_path(path)
+        score = converter.parse(musicxml_path)
+        # if len(score.parts) != 4:
+        #     if self.config.get('verbose', False):
+        #         print(f"Warning: Expected 4 parts in the score, but found {len(score.parts)}. Check the MusicXML file for potential issues.")
+        #     return None, [], question_values, {}
+        # else:
         ground_truth, ground_truth_pool, new_values = method(path, question_values) # self.get_nth_note_ground_truth(path, question_values)
         #new values look like this 
         #{'target_index': 38, 'voice': 'S'}
         # i need: new_words = {"target_index": 38th, "voice": "soprano"}
+        if ground_truth is None:
+            if self.config.get('verbose', False):
+                print(f"Could not extract ground truth for question {method.__name__}. This question will be skipped.")
+            return None, [], question_values, {}
+        
         new_words = {}
-      
         for var_name, value_symbol in new_values.items():
             value_symbol = str(value_symbol)
             if var_name in self.ontology:
                 if var_name == 'target_index':
                     new_words[var_name] = self.ontology['target_index'][int(value_symbol)][value_symbol]
+                elif var_name == 'voice' and self.use_xml_part_names:
+                    continue  # already the part name taken from the MusicXML
                 else:
                     possible_dicts = self.ontology[var_name]
                     for dict_item in possible_dicts:
@@ -1315,13 +1285,12 @@ class AnswerDistractorExtractors:
         #     method_name = method.__name__
         #     ground_truth_pool = self.rng.choice(self.random_distractor_pools[method_name], self.distractor_pool_size, replace=False).tolist()
 
-    
-       # distractor_pool = self.get_distractors(distractor_keys, ground_truth_pool)
-       # breakpoint()
-       # additional, just safety reasons: Ensure the ground truth is not in the distractor pool
+
+    # distractor_pool = self.get_distractors(distractor_keys, ground_truth_pool)
+    # breakpoint()
+    # additional, just safety reasons: Ensure the ground truth is not in the distractor pool
         if ground_truth in ground_truth_pool:
             ground_truth_pool.remove(ground_truth)
-
 
         if len(set(ground_truth_pool))< self.min_num_distractors:
             # Not enough distractors. We need to add additional distractors (from the pool of random distractors for the given question)
@@ -1350,9 +1319,9 @@ class AnswerDistractorExtractors:
             
             ground_truth_pool += additional_distractors
 
-            if len(ground_truth_pool) < self.min_num_distractors:
-                if self.verbose:
-                    print(f"Warning: Not enough unique distractors available to reach the minimum of {self.min_num_distractors}. Only {len(set(ground_truth_pool))} unique distractors will be used.")
+        if len(ground_truth_pool) < self.min_num_distractors:
+            if self.verbose:
+                print(f"Warning: Not enough unique distractors available to reach the minimum of {self.min_num_distractors}. Only {len(set(ground_truth_pool))} unique distractors will be used.")
 
         ground_truth_pool = list(set(ground_truth_pool))
 

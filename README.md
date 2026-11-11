@@ -37,7 +37,7 @@ Read this before planning work around the pipeline.
 | Dataset | Status | Notes |
 | :--- | :--- | :--- |
 | [ChoraleBricks](https://doi.org/10.5281/zenodo.15081741) | Verified | Primary development dataset. `prepare_data.sh` downloads and prepares it. |
-| [ChoralSynth](https://doi.org/10.5281/zenodo.10161065) | Verified — required adaptation | Lives on the `dataset-choralsynth` branch, **not merged into `main`**. Needed: voices addressed by number instead of the hard-coded `S`/`A`/`T`/`B` mapping; part names extracted from the score behind a `use_xml_part_names` setting; a monophonicity check that skips non-conforming voices; skipping questions when a piece lacks the expected voice count; enharmonic tonality names and a guard for ground truth absent from the ontology; and handling of larger pieces in data preparation. |
+| [ChoralSynth](https://doi.org/10.5281/zenodo.10161065) | Verified — required adaptation | Supported on `main` with its own config `benchmark-generation-config-choral-synth.yaml`; `prepare_data_choral_synth.sh` prepares the data. Needed: voices addressed by number instead of the hard-coded `S`/`A`/`T`/`B` mapping; part names extracted from the score behind a `use_xml_part_names` setting; a monophonicity check that skips non-conforming voices; skipping questions when a piece lacks the expected voice count; enharmonic tonality names and a guard for ground truth absent from the ontology; and handling of larger pieces in data preparation. |
 | Anything else | Unverified | — |
 
 ## Links
@@ -121,9 +121,6 @@ bash prepare_data.sh
 
 #### ChoralSynth
 ```bash
-# Checkout to a different branch
-git checkout dataset-choralsynth
-
 # Download ChoralSynth and process it to the required format
 bash prepare_data_choral_synth.sh
 ```
@@ -132,13 +129,29 @@ bash prepare_data_choral_synth.sh
 ## Quick Start
 
 ### Step A: Generate a Benchmark
+Each source dataset has its own generation config:
+
+| Dataset | Config | Pieces list |
+|---|---|---|
+| ChoraleBricks | `benchmark-generation-config-chorale-bricks.yaml` | `pieces-chorale-bricks.tsv` |
+| ChoralSynth | `benchmark-generation-config-choral-synth.yaml` | `pieces-choral-synth.tsv` |
+
+The two configs differ only in the pieces list and in `use_xml_part_names` (ChoralSynth pieces have varying voices, so the voice names are taken from the MusicXML part names instead of the ontology).
+
 ```bash
+# ChoraleBricks
 .venv/bin/python generate_benchmark.py \
-    --config benchmark-generation-config.yaml \
+    --config benchmark-generation-config-chorale-bricks.yaml \
     --benchmark_file test_benchmark.tsv \
-    --questions_per_subcategory_count 10 
+    --questions_per_subcategory_count 10
+
+# ChoralSynth
+.venv/bin/python generate_benchmark.py \
+    --config benchmark-generation-config-choral-synth.yaml \
+    --benchmark_file test_benchmark_choral_synth.tsv \
+    --questions_per_subcategory_count 10
 ```
-*The `questions_per_subcategory_count` parameter specifies questions per category-modality combination.*
+*The `questions_per_subcategory_count` parameter specifies questions per category-modality combination.* Generation is deterministic: the same config and seed always give a byte-identical benchmark file.
 
 ### Step B: Run Inference
 ```bash
@@ -173,7 +186,7 @@ documented in **[CONTRIBUTING.md](CONTRIBUTING.md)**, with a complete worked exa
 - **Benchmark Instance:** [seed_52.tsv](benchmarks/qs_per_subcat_20/seed_52.tsv) (the one used as the one instance in the experiments)
 
 ### ChoralSynth
-- **Benchmark Instance:** [choralsynth.size20.seed_52.tsv](benchmarks/choralsynth.size20.seed_52.tsv) (the one used as the one instance in the experiments)
+- **Benchmark Instance:** [choralsynth.size20.seed_52.tsv](benchmarks/choralsynth.size20.seed_52.tsv) (the instance used in the experiments; generated from the `dataset-choralsynth` branch code, tag `provenance-reported-results-choralsynth`. Regenerating with the current code gives a different instance.)
 
 ## Inference & Parsing
 
@@ -277,19 +290,19 @@ This repository combines original material by the authors with data derived from
 
 | Component | License | Full text |
 | :--- | :--- | :--- |
-| Source code (all `.py` / `.sh` scripts) and original, non-derived data/config (`ontology.yaml`, `meta-questions.tsv`, `pieces.tsv`, `selected_cadences.yaml`, `all_pox_cadence_types.yaml`, `eval-config.yaml`, `benchmark-generation-config.yaml`) | **GPL-3.0-or-later** | [LICENSE](LICENSE) / [LICENSE-SOURCE-CODE](LICENSE-SOURCE-CODE) |
+| Source code (all `.py` / `.sh` scripts) and original, non-derived data/config (`ontology.yaml`, `meta-questions.tsv`, `pieces-*.tsv`, `selected_cadences.yaml`, `all_pox_cadence_types.yaml`, `eval-config.yaml`, `benchmark-generation-config-*.yaml`) | **GPL-3.0-or-later** | [LICENSE](LICENSE) / [LICENSE-SOURCE-CODE](LICENSE-SOURCE-CODE) |
 | Benchmark data **derived from ChoraleBricks** (e.g. `benchmarks/qs_per_subcat_20/seed_52.tsv`) | **CC BY 4.0** | [LICENSE-DATA-CHORALEBRICKS](LICENSE-DATA-CHORALEBRICKS) |
-| Benchmark data **derived from ChoralSynth** (`benchmarks/choralsynth.*.tsv` and the `dataset-choralsynth` branch) | **CC BY-SA 4.0** | [LICENSE-DATA-CHORALSYNTH](LICENSE-DATA-CHORALSYNTH) |
+| Benchmark data **derived from ChoralSynth** (`benchmarks/choralsynth.*.tsv`) | **CC BY-SA 4.0** | [LICENSE-DATA-CHORALSYNTH](LICENSE-DATA-CHORALSYNTH) |
 | `src/mmmu_eval_utils.py` (modified copy of one file from the MMMU-Benchmark project) | **Apache 2.0**, redistributed as part of the GPL-covered source per Apache-2.0 §4 | [LICENSE-THIRD-PARTY-MMMU](LICENSE-THIRD-PARTY-MMMU); see file header for attribution and the list of changes |
 | `results/`, `aggregated/`, `benchmark-comparisons/`, `logs/` (raw and aggregated model outputs, inference logs) | Not separately licensed — provided as-is for reproducibility | — |
 
-Most source files carry a short header identifying them as GPL-3.0-or-later; `meta-questions.tsv` and `pieces.tsv` are GPL-covered too but don't carry an inline header, since prepending a comment line would break the TSV parsing that reads them — their license is documented here instead.
+Most source files carry a short header identifying them as GPL-3.0-or-later; `meta-questions.tsv` and `pieces-*.tsv` are GPL-covered too but don't carry an inline header, since prepending a comment line would break the TSV parsing that reads them — their license is documented here instead.
 
 **Why GPL for code but CC for data:** GPL is designed for software; it doesn't fit non-code creative/data works well, so the two ChoraleBricks/ChoralSynth-derived benchmark data licenses follow the upstream datasets' own terms instead of the code's license.
 
 **Why two data licenses:** ChoraleBricks is licensed CC BY 4.0, so instances derived from it stay CC BY 4.0. ChoralSynth is licensed CC BY-SA 4.0, and the **ShareAlike** term is contagious — any material derived from ChoralSynth, including these benchmark instances, must remain under CC BY-SA 4.0 with attribution to ChoralSynth.
 
-**How derived data is delineated:** benchmark instances built from ChoralSynth are named with a `choralsynth` prefix (and the ChoralSynth source pieces live on the `dataset-choralsynth` branch); all other benchmark instances are built from ChoraleBricks. See [benchmarks/README.md](benchmarks/README.md) for the per-file breakdown. When in doubt, treat any `choralsynth*` file as **CC BY-SA 4.0**.
+**How derived data is delineated:** benchmark instances built from ChoralSynth are named with a `choralsynth` prefix (the list of ChoralSynth pieces is `pieces-choral-synth.tsv`); all other benchmark instances are built from ChoraleBricks. See [benchmarks/README.md](benchmarks/README.md) for the per-file breakdown. When in doubt, treat any `choralsynth*` file as **CC BY-SA 4.0**.
 
 **Outputs are not separately licensed.** `results/`, `aggregated/`, and `benchmark-comparisons/` contain raw and aggregated model outputs (inference results, evaluation tables, comparison files) generated by running the GPL-licensed scripts over the benchmark data; they're kept in the repository for reproducibility but are not themselves assigned a license. `logs/` (mostly gitignored) is the same.
 
