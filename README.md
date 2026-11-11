@@ -46,8 +46,7 @@ Read this before planning work around the pipeline.
   Skills on (Almost) Any Music*](https://arxiv.org/abs/2607.06015) (arXiv:2607.06015) — the code,
   data preparation scripts, benchmark instances, inference logs and results behind it are all in
   this repository.
-- **Late-breaking demo:** *Bring Your Own Music: Towards Community-Built, On-Demand Benchmarks of
-  MLLM Music Perception*, submitted to the ISMIR 2026 Late-Breaking Demo track.
+- **Late-breaking demo:** *[Bring Your Own Music: Towards Community-Built, On-Demand Benchmarks of MLLM Music Perception](https://ismir2026program.ismir.net/lbd_588.html)*, presented at the ISMIR 2026 Late-Breaking Demo track.
 - **[Online demo](https://tomsouri.github.io/MusICA-MetaBench/)** — answer 20 generated benchmark
   items yourself and see what the eight evaluated models answered. Source in [docs/](docs/).
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — how to add a question template, a dataset or a format.
@@ -63,15 +62,8 @@ reachable by tag:
 | :--- | :--- |
 | `v0.0-preprint` | The state released with the arXiv preprint, including the license overhaul. This is what the preprint's link refers to. |
 | `provenance-reported-results` | The tree behind the numbers reported in the preprint: it sits after every commit that added results, inference logs and plots. Check this out if you want to verify a reported figure. |
+| `provenance-reported-results-choralsynth` | The tip of the `dataset-choralsynth` branch before its merge into `main`: the code that ChoralSynth was added with. It does not regenerate the committed ChoralSynth instance byte for byte (see the ChoralSynth benchmark instance below). |
 
-Papers link the repository **root**, not a tag, so that the link stays an invitation to
-contribute rather than landing readers on a frozen tree; this table is how you get from the root
-to a specific frozen state.
-
-> **Note on the old repository name.** This repository was renamed from `MusICA-MetaBench-preprint`,
-> and GitHub redirects the old URL — which matters, because that URL is printed in the published
-> arXiv preprint and cannot be edited. **The name `MusICA-MetaBench-preprint` must never be reused
-> for a new repository**: creating one silently breaks the redirect and orphans the published link.
 
 ## Key Features
 
@@ -186,7 +178,7 @@ documented in **[CONTRIBUTING.md](CONTRIBUTING.md)**, with a complete worked exa
 - **Benchmark Instance:** [seed_52.tsv](benchmarks/qs_per_subcat_20/seed_52.tsv) (the one used as the one instance in the experiments)
 
 ### ChoralSynth
-- **Benchmark Instance:** [choralsynth.size20.seed_52.tsv](benchmarks/choralsynth.size20.seed_52.tsv) (the instance used in the experiments; generated from the `dataset-choralsynth` branch code, tag `provenance-reported-results-choralsynth`. Regenerating with the current code gives a different instance.)
+- **Benchmark Instance:** [choralsynth.size20.seed_52.tsv](benchmarks/choralsynth.size20.seed_52.tsv) (the instance used in the experiments; generated from the `dataset-choralsynth` branch code, tag `provenance-reported-results-choralsynth`. Due to human error, neither that tag nor the current code regenerates this file byte for byte, so to reproduce the reported results, evaluate the committed file rather than a regenerated one.)
 
 ## Inference & Parsing
 
