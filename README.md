@@ -1,5 +1,37 @@
 # Music I Care About Meta-Benchmark (MusICA MetaBench)
 
+> **This is the release accompanying the CHR 2027 paper** *Music I Care About (MusICA-MetaBench):
+> Automated On-Demand Multimodal Music Perception Benchmarking of LLMs*. To reproduce the reported
+> results, see [Reproducing the CHR 2027 results](#reproducing-the-chr-2027-results). The
+> repository itself keeps evolving on `main`.
+
+## Reproducing the CHR 2027 results
+
+The results reported in the paper were obtained in April 2026 (the same runs as in the arXiv
+preprint). This release tag (`chr2027`) contains newer code than was used for them. The exact code
+states are frozen in two tags, one per dataset:
+
+| Dataset | Tag | Benchmark instance to evaluate |
+| :--- | :--- | :--- |
+| ChoraleBricks | [`provenance-reported-results`](https://github.com/tomsouri/MusICA-MetaBench/tree/provenance-reported-results) | [benchmarks/qs_per_subcat_20/seed_52.tsv](benchmarks/qs_per_subcat_20/seed_52.tsv) |
+| ChoralSynth | [`provenance-reported-results-choralsynth`](https://github.com/tomsouri/MusICA-MetaBench/tree/provenance-reported-results-choralsynth) | [benchmarks/choralsynth.size20.seed_52.tsv](benchmarks/choralsynth.size20.seed_52.tsv) |
+
+- **ChoraleBricks:** `provenance-reported-results` is the tree behind the reported numbers, after
+  every commit that added results, inference logs and plots.
+- **ChoralSynth:** `provenance-reported-results-choralsynth` is the tip of the former
+  `dataset-choralsynth` branch, which has since been merged into `main`. Its benchmark-generation
+  code is identical to the code the results were obtained with; later commits on that branch only
+  added or fixed data preparation. Neither that tag nor the current code regenerates the committed
+  ChoralSynth instance byte for byte, so **evaluate the committed TSV file rather than a
+  regenerated one**. Evaluation needs `symbolic.abc.txt` for every piece, which
+  `prepare_data_choral_synth.sh` creates (it needs MuseScore).
+- Rendered score images depend on the MuseScore version. At `provenance-reported-results`,
+  `src/conversions/musicxml2pdf.py` defaults to MuseScore 4.6.4; at
+  `provenance-reported-results-choralsynth` it auto-detects the installed MuseScore.
+- Inference against commercial APIs is not bit-reproducible (see
+  [Technical Setup](#technical-setup-of-running-llms)); the committed per-model results under
+  `results/` and `aggregated/` are the ones reported.
+
 **Generate a multiple-choice benchmark of music perception, on demand, from the music you care
 about.** Give the pipeline a set of pieces and it produces questions about pitch, rhythm and
 harmony, asking the same question of an audio recording, a score image and symbolic notation, so
@@ -42,6 +74,9 @@ Read this before planning work around the pipeline.
 
 ## Links
 
+- **Paper (CHR 2027):** *Music I Care About (MusICA-MetaBench): Automated On-Demand Multimodal
+  Music Perception Benchmarking of LLMs* — this release is its accompanying code and data; see
+  [Citation](#citation).
 - **Preprint:** [*Music I Care About: Automated Multimodal Benchmarking of LLM Music Perception
   Skills on (Almost) Any Music*](https://arxiv.org/abs/2607.06015) (arXiv:2607.06015) — the code,
   data preparation scripts, benchmark instances, inference logs and results behind it are all in
@@ -60,6 +95,7 @@ reachable by tag:
 
 | Tag | What it is |
 | :--- | :--- |
+| `chr2027` | This release: the state accompanying the CHR 2027 paper. For the code the reported results were obtained with, use the two `provenance-reported-results*` tags below. |
 | `v0.0-preprint` | The state released with the arXiv preprint, including the license overhaul. This is what the preprint's link refers to. |
 | `provenance-reported-results` | The tree behind the numbers reported in the preprint: it sits after every commit that added results, inference logs and plots. Check this out if you want to verify a reported figure. |
 | `provenance-reported-results-choralsynth` | The tip of the `dataset-choralsynth` branch before its merge into `main`: the code that ChoralSynth was added with. It does not regenerate the committed ChoralSynth instance byte for byte (see the ChoralSynth benchmark instance below). |
@@ -178,7 +214,7 @@ documented in **[CONTRIBUTING.md](CONTRIBUTING.md)**, with a complete worked exa
 - **Benchmark Instance:** [seed_52.tsv](benchmarks/qs_per_subcat_20/seed_52.tsv) (the one used as the one instance in the experiments)
 
 ### ChoralSynth
-- **Benchmark Instance:** [choralsynth.size20.seed_52.tsv](benchmarks/choralsynth.size20.seed_52.tsv) (the instance used in the experiments; generated from the `dataset-choralsynth` branch code, tag `provenance-reported-results-choralsynth`. Due to human error, neither that tag nor the current code regenerates this file byte for byte, so to reproduce the reported results, evaluate the committed file rather than a regenerated one.)
+- **Benchmark Instance:** [choralsynth.size20.seed_52.tsv](benchmarks/choralsynth.size20.seed_52.tsv) (the instance used in the experiments; generated from the former `dataset-choralsynth` branch code, tag [`provenance-reported-results-choralsynth`](https://github.com/tomsouri/MusICA-MetaBench/tree/provenance-reported-results-choralsynth). Due to human error, neither that tag nor the current code regenerates this file byte for byte, so to reproduce the reported results, evaluate the committed file rather than a regenerated one.)
 
 ## Inference & Parsing
 
@@ -263,6 +299,18 @@ against commercial APIs is not bit-reproducible: the models drift, and endpoints
 ## Citation
 
 If you use this benchmark or code, please cite our paper:
+
+```bibtex
+@inproceedings{sourada2027musica,
+      title={Music I Care About (MusICA-MetaBench): Automated On-Demand Multimodal Music Perception Benchmarking of LLMs},
+      author={Tomáš Sourada and Katia Vendrame and Jan Hajič jr},
+      booktitle={Proceedings of the Computational Humanities Research Conference (CHR 2027)},
+      year={2027},
+      note={To appear},
+}
+```
+
+The arXiv preprint:
 
 ```bibtex
 @misc{sourada2026musicicareabout,
