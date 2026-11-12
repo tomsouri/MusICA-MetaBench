@@ -36,7 +36,7 @@ def shorten_model_name(name):
         return name[:12] + '...'
     return name
 
-def generate_spider_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, compact=False, extended_palette=False):
+def generate_spider_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, compact=False, dpi=300):
     # Load data
     df = pd.read_csv(input_file, sep='\t')
     
@@ -85,9 +85,11 @@ def generate_spider_chart(input_file, output_file, criterion_type, excluded_mode
         model_columns = sorted(model_columns, key=lambda x: model_scores[x], reverse=True)
         
     # High contrast, colorblind-friendly color palette
-    cb_colors = ['#0077BB', '#EE7733', '#009988', '#CC3311', '#AA4499', '#EECC66']
-    if extended_palette:
-        cb_colors += ['#882255', '#332288', '#999933']
+    cb_colors = ['#0077BB', '#EE7733', '#009988', '#CC3311', '#AA4499', '#EECC66', '#882255', '#332288', '#999933', '#000000', '#88CCEE']
+    # Beyond the palette, colors repeat, so the repeated ones get a different line style
+    line_styles = ['solid', 'dashed', 'dotted', 'dashdot']
+    # Each model also gets its own marker, so lines stay apart even where colors look alike
+    markers = ['o', 's', '^', 'D', 'v', 'P', 'X', '*', 'p', 'h', '<']
         
     max_accuracy = 0
     for i, model in enumerate(model_columns):
@@ -97,7 +99,8 @@ def generate_spider_chart(input_file, output_file, criterion_type, excluded_mode
         values += values[:1]
         
         color = cb_colors[i % len(cb_colors)]
-        ax.plot(angles, values, linewidth=2, linestyle='solid', label=shorten_model_name(model), color=color)
+        line_style = line_styles[(i // len(cb_colors)) % len(line_styles)]
+        ax.plot(angles, values, linewidth=2, linestyle=line_style, marker=markers[i % len(markers)], markersize=8, label=shorten_model_name(model), color=color)
         ax.fill(angles, values, alpha=0.1, color=color)
 
     # Add random baseline if requested
@@ -136,7 +139,7 @@ def generate_spider_chart(input_file, output_file, criterion_type, excluded_mode
     # ensure the output directory exists
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
-    plt.savefig(output_file, bbox_inches='tight')
+    plt.savefig(output_file, bbox_inches='tight', dpi=dpi)
     print(f"Chart saved to {output_file}")
 
 if __name__ == "__main__":
@@ -149,8 +152,8 @@ if __name__ == "__main__":
     parser.add_argument('--baseline', action='store_true', help='Include a random baseline at 20%% accuracy')
     parser.add_argument('--font_size', type=int, default=12, help='Font size for the plot labels and legend')
     parser.add_argument('--compact', action='store_true', help='Make the chart more compact (crop axes at 80%% if possible, rotate chart)')
-    parser.add_argument('--extended_palette', action='store_true', help='Add 3 more colors, so that up to 9 models do not share a color')
+    parser.add_argument('--dpi', type=int, default=300, help='Resolution of raster output such as PNG (default: 300)')
 
     args = parser.parse_args()
 
-    generate_spider_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.compact, args.extended_palette)
+    generate_spider_chart(args.input_file, args.output_file, args.criterion_type, args.exclude, args.include, args.baseline, args.font_size, args.compact, args.dpi)

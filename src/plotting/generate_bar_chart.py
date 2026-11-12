@@ -39,7 +39,7 @@ def shorten_model_name(name):
 def clean_label(label):
     return str(label).replace('audio.mastermix.wav', 'Audio').replace('symbolic.abc.txt', 'Symbolic (ABC)').replace('visual.short.png', 'Image')
 
-def generate_bar_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, group_by_models, round_to_int, bold_best, sort_per_group, show_names_below, y_limit, height, show_guide_lines, tight_crop, width=14, dpi=None, extended_palette=False, marked_models=None):
+def generate_bar_chart(input_file, output_file, criterion_type, excluded_models, included_models, include_baseline, font_size, group_by_models, round_to_int, bold_best, sort_per_group, show_names_below, y_limit, height, show_guide_lines, tight_crop, width=14, dpi=300, extended_palette=False, marked_models=None):
     # Load data
     df = pd.read_csv(input_file, sep='\t')
     
@@ -263,7 +263,7 @@ if __name__ == "__main__":
     parser.add_argument('--show_guide_lines', action='store_true', help='Show soft dotted guide lines from model names to bars')
     parser.add_argument('--tight_crop', action='store_true', help='Crop the final image to the absolute minimum bounding box')
     parser.add_argument('--width', type=float, default=14, help='Width of the plot in inches (increase for more models)')
-    parser.add_argument('--dpi', type=int, help='Resolution of raster output such as PNG (default: matplotlib default of 100)')
+    parser.add_argument('--dpi', type=int, default=300, help='Resolution of raster output such as PNG (default: 300)')
     parser.add_argument('--extended_palette', action='store_true', help='Add 3 more colors, so that up to 11 models do not share a color')
     parser.add_argument('--mark_models', nargs='*', help='Models whose names below the bars are written in italics with an asterisk (with --show_names_below)')
 

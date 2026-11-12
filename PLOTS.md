@@ -86,7 +86,7 @@ The options that differ from the paper version:
 - `--width 18` makes room for 11 models. The default of 14 fits 8.
 - `--extended_palette` adds 3 colors. Without it, colors repeat from the 9th model on.
 
-If the poster tool needs a PNG, use a `.png` output file and add `--dpi 600`. At `--width 18` that gives
+PNG output is 300 dpi by default. If the poster tool needs a PNG, use a `.png` output file and add `--dpi 600`. At `--width 18` that gives
 about 8800 px across, which prints at 300 dpi up to about 75 cm wide. Text scales with the print: 15 pt
 in an 18-inch figure comes out at about 30 pt on a 75 cm print.
 
@@ -112,7 +112,8 @@ Same data, one group of three bars per model. A model without audio has a gap in
 ### Spider chart by subcategory
 
 `--criterion_type` also accepts `submodality`, `category` and the other criteria in the table. Pass the
-models to leave out to `--exclude`, or the ones to keep to `--include`.
+models to leave out to `--exclude`, or the ones to keep to `--include`. Up to 11 models get distinct colors; from the
+12th on, colors repeat with a dashed, then dotted line. Each model also has its own marker shape.
 
 Leave out models without audio (see [Limitations](#limitations)), as in this example:
 
@@ -123,14 +124,13 @@ Leave out models without audio (see [Limitations](#limitations)), as in this exa
       --baseline \
       --font_size 15 \
       --compact \
-      --extended_palette \
       --output_file $POSTER/spider_by_subcategory.pdf
 ```
 
 ### Normal vs no-input vs noise-input
 
 Writes one PNG per panel: overall and each modality, named `<prefix>_OVERALL.png` and so on. This script
-always writes PNG, so set the resolution with `--dpi`.
+always writes PNG, at 300 dpi unless you set `--dpi`.
 
 ```bash
 .venv/bin/python3 src/plotting/generate_plot_with_comparison_of_normal_textonly_noise.py \
