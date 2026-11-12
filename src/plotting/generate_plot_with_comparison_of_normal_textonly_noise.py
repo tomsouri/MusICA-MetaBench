@@ -36,7 +36,7 @@ def parse_args():
         help="Prefix for output PNG files (default: 'plot').",
     )
     parser.add_argument(
-        "--dpi", type=int, default=150, help="DPI for output images (default: 150)."
+        "--dpi", type=int, default=300, help="DPI for output images (default: 300)."
     )
     parser.add_argument(
         "--ignore-incomplete",
@@ -145,7 +145,7 @@ def make_plot(
     accuracy_dict,
     models,
     output_path,
-    dpi=150,
+    dpi=300,
     ignore_incomplete=False,
     print_only_average=False,
     y_max=105.0,

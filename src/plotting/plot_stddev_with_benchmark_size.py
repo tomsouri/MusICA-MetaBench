@@ -96,13 +96,13 @@ def plot_stddev(input_file, output_file=None, exclude_size_one=False, log_x=Fals
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        plt.savefig(output_file)
+        plt.savefig(output_file, dpi=300)
         print(f"Plot saved to {output_file}")
     else:
         # Default output name based on input
         base = os.path.splitext(input_file)[0]
         out = f"{base}_plot.png"
-        plt.savefig(out)
+        plt.savefig(out, dpi=300)
         print(f"Plot saved to {out}")
 
 if __name__ == "__main__":
